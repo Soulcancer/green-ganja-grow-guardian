@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fensterhintergrund in App-Farbe, damit beim Start nichts weiß aufblitzt; den Rest macht Compose -->
+    <style name="Theme.GrowGuardian" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/grow_background</item>
+        <item name="android:statusBarColor">@color/grow_background</item>
+        <item name="android:navigationBarColor">@color/grow_background</item>
+    </style>
+</resources>

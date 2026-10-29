@@ -1,0 +1,22 @@
+# Als local.properties kopieren und ausfüllen. Diese Datei NIE ins Git.
+sdk.dir=/Pfad/zum/Android/sdk
+
+# RevenueCat (öffentliche SDK-Keys)
+revenuecat.key.debug=test_XXXXXXXX
+revenuecat.key.release=goog_XXXXXXXX
+
+# Tuya IoT Platform → eure App → SDK-Zugang
+tuya.appKey=XXXXXXXX
+tuya.appSecret=XXXXXXXX
+
+# AdMob (für den Release; Debug nutzt immer Googles Test-IDs)
+admob.appId=ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX
+admob.banner=ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX
+admob.rewarded=ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX
+admob.appOpen=ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX
+
+# Upload-Schlüssel für Google Play (Play App Signing verwaltet den eigentlichen App-Schlüssel)
+release.storeFile=upload-keystore.jks
+release.storePassword=XXXXXXXX
+release.keyAlias=upload
+release.keyPassword=XXXXXXXX

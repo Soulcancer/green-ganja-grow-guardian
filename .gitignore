@@ -1,0 +1,14 @@
+.gradle/
+build/
+/local.properties
+/keystore.properties
+*.jks
+*.keystore
+app/google-services.json
+app/libs/*.aar
+.idea/
+*.iml
+backend/functions/node_modules/
+backend/functions/lib/
+backend/functions/lib-test/
+backend/functions/.env

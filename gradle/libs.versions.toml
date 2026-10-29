@@ -1,0 +1,52 @@
+# Versionen vom Stand der Entwicklung. Vor dem ersten Build in Android Studio
+# „Refactor → Update Versions“ bzw. die Vorschläge im Editor übernehmen und dann testen.
+[versions]
+agp = "8.11.1"
+kotlin = "2.2.0"
+googleServices = "4.4.3"
+composeBom = "2025.07.00"
+activityCompose = "1.10.1"
+lifecycle = "2.9.2"
+coreKtx = "1.16.0"
+coroutines = "1.10.2"
+firebaseBom = "35.1.0"
+revenuecat = "11.0.0"
+playServicesAds = "24.5.0"
+ump = "3.2.0"
+work = "2.11.2"
+tuya = "7.11.0"
+tuyaExpansion = "7.11.1"
+junit = "4.13.2"
+
+[libraries]
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+# Wird nicht mehr weiterentwickelt, 1.7.8 ist die letzte Version
+compose-icons-extended = { module = "androidx.compose.material:material-icons-extended", version = "1.7.8" }
+coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-auth = { module = "com.google.firebase:firebase-auth" }
+firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
+firebase-functions = { module = "com.google.firebase:firebase-functions" }
+firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
+revenuecat = { module = "com.revenuecat.purchases:purchases", version.ref = "revenuecat" }
+play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
+ump = { module = "com.google.android.ump:user-messaging-platform", version.ref = "ump" }
+work-runtime = { module = "androidx.work:work-runtime", version.ref = "work" }
+tuya-sdk = { module = "com.thingclips.smart:thingsmart", version.ref = "tuya" }
+tuya-expansion = { module = "com.thingclips.smart:thingsmart-expansion-sdk", version.ref = "tuyaExpansion" }
+junit = { module = "junit:junit", version.ref = "junit" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

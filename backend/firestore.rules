@@ -1,0 +1,177 @@
+rules_version = '2';
+
+// Die App liest nur. Alles Schreiben läuft über die Cloud Functions, die Grenzen und Rechte prüfen.
+// Einzige Ausnahme: Messwerte für den Verlauf der eigenen Boxen (history), mit festem Format.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isStaff(clubId) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/clubs/$(clubId)).data.staffUids;
+    }
+
+    function isActiveMember(clubId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/memberships/$(request.auth.uid))
+        && get(/databases/$(database)/documents/memberships/$(request.auth.uid)).data.clubId == clubId
+        && get(/databases/$(database)/documents/memberships/$(request.auth.uid)).data.status == 'active';
+    }
+
+    // Eigene Club-Zugehörigkeit
+    match /memberships/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /clubs/{clubId} {
+      // Club-Daten inkl. Mitglieder-Code: nur das Team
+      allow read: if signedIn() && request.auth.uid in resource.data.staffUids;
+
+      // Mitgliederliste: das Team; jedes Mitglied sieht nur sich selbst
+      match /members/{memberUid} {
+        allow read: if isStaff(clubId) || (signedIn() && request.auth.uid == memberUid);
+      }
+
+      // Reservierungen: das Team; Mitglieder nur ihre eigenen
+      match /reservations/{reservationId} {
+        allow read: if isStaff(clubId) || (signedIn() && resource.data.memberUid == request.auth.uid);
+      }
+
+      // Gemeinsame Club-Boxen: jedes aktive Mitglied und das Team liest; die Konfiguration schreiben die
+      // Functions, die letzten Messwerte (latest) nur der Betreuer, im festen Format
+      match /growBoxes/{boxId} {
+        allow read: if isStaff(clubId) || isActiveMember(clubId);
+        allow update: if signedIn()
+          && request.auth.uid == resource.data.keeperUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['latest'])
+          && request.resource.data.latest.keys().hasOnly(['at', 'online', 'values'])
+          && request.resource.data.latest.at is timestamp
+          && request.resource.data.latest.online is bool
+          && request.resource.data.latest.values is map
+          && request.resource.data.latest.values.size() <= 12;
+      }
+
+      // Marktplatz: aktive Mitglieder und das Team lesen; geschrieben wird nur über die Functions
+      match /listings/{listingId} {
+        allow read: if isStaff(clubId) || isActiveMember(clubId);
+
+        // Interesse: der Anbieter, wer Interesse gemeldet hat, und das Team
+        match /interests/{interestUid} {
+          allow read: if isStaff(clubId)
+            || (signedIn() && (request.auth.uid == interestUid || request.auth.uid == resource.data.sellerUid));
+        }
+
+        match /reports/{reportUid} {
+          allow read: if isStaff(clubId);
+        }
+      }
+
+      match /propagationRequests/{requestId} {
+        allow read: if isStaff(clubId) || (signedIn() && resource.data.memberUid == request.auth.uid);
+      }
+
+      match /propagationLog/{entryId} {
+        allow read: if isStaff(clubId);
+      }
+
+      // Abgabe-Dokumentation nach § 26 KCanG: nur das Team
+      match /dispensations/{dispensationId} {
+        allow read: if isStaff(clubId);
+      }
+    }
+
+    function isUser(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Push-Token für Alarme: jeder Nutzer verwaltet nur seine eigenen
+    match /users/{uid}/pushTokens/{token} {
+      allow read, delete: if isUser(uid);
+      allow create, update: if isUser(uid)
+        && request.resource.data.keys().hasOnly(['platform', 'updatedAt'])
+        && token.size() < 400;
+    }
+
+    // Zustand der Server-Überwachung: die App liest nur, ob der Server gerade überwacht
+    match /users/{uid}/serverState/{docId} {
+      allow read: if isUser(uid);
+    }
+
+    // Coins: nur lesen; gebucht wird ausschließlich in den Functions
+    match /wallets/{uid} {
+      allow read: if isUser(uid);
+      match /ledger/{entryId} {
+        allow read: if isUser(uid);
+      }
+    }
+
+    // Eigene Grow-Boxen; geschrieben wird über saveGrowBox und deleteGrowBox, die die Limits prüfen
+    match /users/{uid}/growBoxes/{boxId} {
+      allow read: if isUser(uid);
+
+      // Messwerte eines UTC-Tages: schreibt die App (Hintergrund-Job), die Löschfrist setzt nur die Function
+      match /history/{day} {
+        allow read: if isUser(uid);
+        allow create: if isUser(uid)
+          && validHistory(day)
+          && !('expireAt' in request.resource.data)
+          && exists(/databases/$(database)/documents/users/$(uid)/growBoxes/$(boxId));
+        allow update: if isUser(uid)
+          && validHistory(day)
+          && request.resource.data.get('expireAt', null) == resource.data.get('expireAt', null);
+      }
+
+      // Grow-Tagebuch: der Nutzer schreibt selbst, in festem Format
+      match /journal/{entryId} {
+        allow read, delete: if isUser(uid);
+        allow create, update: if isUser(uid)
+          && validJournal(request.resource.data)
+          && exists(/databases/$(database)/documents/users/$(uid)/growBoxes/$(boxId));
+      }
+
+      // Tagesstatistik für lange Zeiträume, schreibt nur die nächtliche Function
+      match /stats/{year} {
+        allow read: if isUser(uid);
+      }
+    }
+
+    // Automationen: Regeln schreiben saveAutomation/deleteAutomation; die App trägt nur das Ergebnis der
+    // Übertragung in die Tuya-Cloud ein
+    match /users/{uid}/automations/{automationId} {
+      allow read: if isUser(uid);
+      allow update: if isUser(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sceneIds', 'syncError', 'syncedAt'])
+        && request.resource.data.sceneIds is list
+        && request.resource.data.sceneIds.size() <= 4;
+    }
+
+    function optionalNumber(data, field, min, max) {
+      return !(field in data) || data[field] == null
+        || ((data[field] is number) && data[field] >= min && data[field] <= max);
+    }
+
+    function validJournal(data) {
+      return data.keys().hasOnly(['date', 'watered', 'waterMl', 'nutrientsMl', 'values', 'notes', 'createdAt', 'updatedAt'])
+        && data.date is string && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.watered is bool
+        && optionalNumber(data, 'waterMl', 0, 100000)
+        && optionalNumber(data, 'nutrientsMl', 0, 10000)
+        && (!('values' in data) || (data.values is map && data.values.size() <= 11))
+        && (!('notes' in data) || data.notes == null || (data.notes is string && data.notes.size() <= 2000));
+    }
+
+    function validHistory(day) {
+      let d = request.resource.data;
+      return day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.keys().hasOnly(['day', 's', 'expireAt'])
+        && d.day == day
+        && d.s is map
+        && d.s.size() <= 288;
+    }
+
+    // invites, tuyaAccounts und alles andere: kein Zugriff aus der App
+  }
+}
