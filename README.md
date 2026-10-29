@@ -55,7 +55,7 @@ Ein Social Club hat außerdem **Mitglieder**: beliebig viele, kostenlos. Sie bea
 | `backend/functions/` | Cloud Functions (TypeScript) inkl. Tests |
 | `backend/firestore.rules`, `firestore.indexes.json` | Leserechte, Indizes, automatische Löschfristen |
 
-**Geprüft:** Der Kotlin-Code ist gegen die API von RevenueCat 11.0.0 (aus dem Quellcode), die Compose-, Material-3-, Activity- und Lifecycle-Signaturen aus dem aktuellen AndroidX-Quellcode, WorkManager- und NotificationCompat-Signaturen aus dem AndroidX-Quellcode, die Tuya-Schnittstellen aus Tuyas offiziellem Beispielprojekt und nachgebildete Firebase-Schnittstellen kompiliert, 100 Unit-Tests laufen grün (u. a. VPD, Datenpunkt-Umrechnung, Limits, Kopplungs-Berechtigungen, Alarm-Regeln und Push-Szenen, Verlauf, Automationen, Club-Boxen, Marktplatz, Werbe-Regeln, Coins, Anmeldung). Das Backend ist mit TypeScript 6 und 7 gegen die Signaturen von firebase-functions 7.4.0 und firebase-admin 14.5.0 typgeprüft, 72 Tests (Server-Überwachung, KCanG-Grenzen, Codes, Webhook-Signatur, Grow-Box-Limits, Aufbewahrung des Verlaufs, Automationen, Club-Boxen, Mitglieder-Einstellungen, Marktplatz, Coins inkl. AdMob-Signaturprüfung) laufen grün. **Noch offen:** ein Gradle-Build mit echten Bibliotheken (hier nicht möglich, weil die Android-Repositories nicht erreichbar sind), ein Test mit echten Tuya-Geräten und gegen den Firebase-Emulator. Die Icon-Namen stammen aus `material-icons-extended` 1.7.8 und sind nicht gegen dessen Quellcode geprüft.
+**Geprüft:** Der Kotlin-Code ist gegen die API von RevenueCat 11.0.0 (aus dem Quellcode), die Compose-, Material-3-, Activity- und Lifecycle-Signaturen aus dem aktuellen AndroidX-Quellcode, WorkManager- und NotificationCompat-Signaturen aus dem AndroidX-Quellcode, die Tuya-Schnittstellen aus Tuyas offiziellem Beispielprojekt und nachgebildete Firebase-Schnittstellen kompiliert, 103 Unit-Tests laufen grün (u. a. VPD, Datenpunkt-Umrechnung, Limits, Kopplungs-Berechtigungen, Alarm-Regeln und Push-Szenen, Verlauf, Automationen, Club-Boxen, Marktplatz, Werbe-Regeln, Coins, Anmeldung). Das Backend ist mit TypeScript 6 und 7 gegen die Signaturen von firebase-functions 7.4.0 und firebase-admin 14.5.0 typgeprüft, 74 Tests (Server-Überwachung, KCanG-Grenzen, Codes, Webhook-Signatur, Grow-Box-Limits, Aufbewahrung des Verlaufs, Automationen, Club-Boxen, Mitglieder-Einstellungen, Marktplatz, Coins inkl. AdMob-Signaturprüfung) laufen grün. **Noch offen:** ein Gradle-Build mit echten Bibliotheken (hier nicht möglich, weil die Android-Repositories nicht erreichbar sind), ein Test mit echten Tuya-Geräten und gegen den Firebase-Emulator. Die Icon-Namen stammen aus `material-icons-extended` 1.7.8 und sind nicht gegen dessen Quellcode geprüft.
 
 ## 1. Anmeldung: Firebase, RevenueCat und Tuya koppeln
 
@@ -285,6 +285,10 @@ Premium und Social Club können Steckdosen und Schaltleisten automatisch schalte
 - **Box löschen:** Die App entfernt zuerst die Tuya-Automationen der Box, dann löscht das Backend Box und Regeln.
 - **Voraussetzung:** Der Sensor muss online sein und seine Werte an die Tuya-Cloud melden. Geräte, die nur lokal (Bluetooth) verbunden sind, lösen keine Cloud-Automation aus.
 - **Steckdosen:** Als schaltbar gelten Bool-Datenpunkte mit dem Code `switch` oder `switch_<n>` (Steckdosenleisten zeigen „Dose n“). Eigene Codes erkennt `DpMapping.isSwitchCode` nicht.
+
+### Grow-Tagebuch
+
+Je Box: Sorte und Starttag (daraus „Tag 30 · Woche 5, Tag 2“), dazu Einträge mit gegossen, Wassermenge, Dünger, von Hand gemessenen Werten (z. B. pH aus dem Tropfentest) und Notizen. Für alle Stufen. Gespeichert unter `users/{uid}/growBoxes/{boxId}/journal`; die App schreibt direkt, die Firestore-Regeln prüfen das Format. Die Einträge sind in „Meine Daten herunterladen“ enthalten und werden beim Löschen der Box oder des Kontos mitgelöscht.
 
 ### Server-Überwachung über die Tuya Cloud (empfohlen)
 
