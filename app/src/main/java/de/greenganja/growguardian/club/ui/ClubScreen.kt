@@ -274,6 +274,7 @@ private fun PendingContent(membership: Membership, viewModel: ClubViewModel) {
 private fun MemberContent(state: ClubUiState, membership: Membership, viewModel: ClubViewModel, onOpenMarket: (() -> Unit)?) {
     var confirmLeave by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Reservation?>(null) }
+    val now = remember(state.clubBoxes) { System.currentTimeMillis() }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -309,7 +310,7 @@ private fun MemberContent(state: ClubUiState, membership: Membership, viewModel:
                 }
             }
         }
-        clubBoxItems(state, remember(state.clubBoxes) { System.currentTimeMillis() }, viewModel)
+        clubBoxItems(state, now, viewModel)
         if (state.dispensing) item { SectionTitle("Meine Reservierungen") }
         if (state.dispensing && state.myReservations.isEmpty()) {
             item { Hint("Noch keine Reservierungen.") }
