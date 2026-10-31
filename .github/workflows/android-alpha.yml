@@ -59,12 +59,21 @@ jobs:
           REVENUECAT_KEY_DEBUG: ${{ secrets.REVENUECAT_KEY_DEBUG }}
         run: |
           set -o pipefail
-          ./gradlew --no-daemon --continue --stacktrace \
+          ./gradlew --no-daemon --continue \
             testPlayDebugUnitTest assemblePlayDebug assembleDirectDebug 2>&1 | tee build.log
 
       - name: Fehler als Annotation
         if: failure()
         run: bash .github/ci/annotate-log.sh build.log
+
+      - name: Abhängigkeiten prüfen
+        if: failure()
+        run: |
+          if grep -q "Could not find " build.log; then
+            m=$(grep -oE "Could not find [^ ]+\." build.log | head -1 | sed -E 's/Could not find (.*)\./\1/')
+            g=$(echo "$m" | cut -d: -f1 | tr . /); a=$(echo "$m" | cut -d: -f2); v=$(echo "$m" | cut -d: -f3)
+            bash .github/ci/diagnose-deps.sh "$g/$a/$v"
+          fi
 
       - uses: actions/upload-artifact@v4
         if: always()
