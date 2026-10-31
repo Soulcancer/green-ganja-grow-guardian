@@ -107,6 +107,14 @@ kotlin { jvmToolchain(17) }
 
 configurations.all {
     exclude(group = "com.thingclips.smart", module = "thingsmart-modularCampAnno")
+    // thingsmart-expansion-sdk 7.11.1 verlangt thingmodule-annotation:1.5.0-SNAPSHOT, das Tuya nicht veröffentlicht.
+    // Stattdessen die neueste veröffentlichte Version nehmen.
+    resolutionStrategy.eachDependency {
+        if (requested.group == "com.thingclips.android.module" && requested.version.orEmpty().endsWith("-SNAPSHOT")) {
+            useVersion("latest.release")
+            because("Tuya veröffentlicht diese SNAPSHOT-Version nicht")
+        }
+    }
 }
 
 dependencies {

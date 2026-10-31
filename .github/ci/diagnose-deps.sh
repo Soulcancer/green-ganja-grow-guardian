@@ -21,6 +21,9 @@ name=$(echo "$mod" | awk -F/ '{print $(NF-1)}')
     c1=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$r/$mod/maven-metadata.xml")
     c2=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$r/$(dirname "$mod")/maven-metadata.xml")
     echo "$c1 $c2 $r"
+    if [ "$c2" = 200 ]; then
+      curl -s -m 20 "$r/$(dirname "$mod")/maven-metadata.xml" | grep -oE "<(version|latest|release)>[^<]+" | tail -15 | tr '\n' ' '; echo
+    fi
   done
   echo
   echo "dependencyInsight $name:"
