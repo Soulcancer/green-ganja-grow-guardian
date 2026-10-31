@@ -24,6 +24,7 @@ class TuyaSession(
 
     suspend fun ensureLoggedIn(firebaseUid: String): Result<Unit> = mutex.withLock {
         runCatching {
+            TuyaRuntime.requireReady()
             val user = ThingHomeSdk.getUserInstance()
             val linkedUid = prefs.getString(KEY_FIREBASE_UID, null)
             if (user.isLogin && linkedUid == firebaseUid) return@runCatching
@@ -36,7 +37,7 @@ class TuyaSession(
 
     /** Beim Abmelden aus der App aufrufen. */
     suspend fun logOut() = mutex.withLock {
-        if (ThingHomeSdk.getUserInstance().isLogin) runCatching { TuyaCalls.logout() }
+        if (TuyaRuntime.ready && ThingHomeSdk.getUserInstance().isLogin) runCatching { TuyaCalls.logout() }
         prefs.edit().remove(KEY_FIREBASE_UID).apply()
     }
 

@@ -35,6 +35,9 @@ android {
 
         manifestPlaceholders["tuyaAppKey"] = secret("tuya.appKey")
         manifestPlaceholders["tuyaAppSecret"] = secret("tuya.appSecret")
+        // Tuya nur starten, wenn App-Key und security-algorithm.aar vorhanden sind (sonst Absturz beim Start)
+        val tuyaReady = secret("tuya.appKey").isNotBlank() && file("libs/security-algorithm.aar").exists()
+        buildConfigField("boolean", "TUYA_CONFIGURED", tuyaReady.toString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

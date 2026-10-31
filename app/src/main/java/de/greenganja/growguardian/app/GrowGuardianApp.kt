@@ -3,7 +3,6 @@ package de.greenganja.growguardian.app
 import android.app.Application
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
-import com.thingclips.smart.home.sdk.ThingHomeSdk
 import de.greenganja.growguardian.BuildConfig
 import de.greenganja.growguardian.ads.AdUnits
 import de.greenganja.growguardian.ads.AdsManager
@@ -19,6 +18,7 @@ import de.greenganja.growguardian.grow.background.GrowMonitorHost
 import de.greenganja.growguardian.grow.background.GrowMonitorWorker
 import de.greenganja.growguardian.grow.history.GrowHistoryRepository
 import de.greenganja.growguardian.rewards.WalletRepository
+import de.greenganja.growguardian.tuya.TuyaRuntime
 import de.greenganja.growguardian.tuya.TuyaAlarmPush
 import de.greenganja.growguardian.grow.alarm.GrowNotifier
 import de.greenganja.growguardian.grow.automation.ServerAutomationEngine
@@ -74,7 +74,7 @@ class GrowGuardianApp : Application(), GrowMonitorHost {
 
     override fun onCreate() {
         super.onCreate()
-        ThingHomeSdk.init(this)
+        TuyaRuntime.init(this, BuildConfig.TUYA_CONFIGURED)
         GrowNotifier(this).ensureChannel() // auch für Push-Nachrichten im Hintergrund
         val auth = FirebaseAuth.getInstance()
         subscriptions.configure(

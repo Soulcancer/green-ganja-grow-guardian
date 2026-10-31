@@ -113,6 +113,8 @@ class SubscriptionManager {
         debugLogs: Boolean = false,
     ) {
         if (Purchases.isConfigured) return
+        // Alpha-Builds ohne Key (Secret fehlt): App läuft, Käufe sind aus
+        if (apiKey.isBlank()) return
         if (debugLogs) Purchases.logLevel = LogLevel.DEBUG
         Purchases.configure(
             PurchasesConfiguration.Builder(context.applicationContext, apiKey)
@@ -232,9 +234,13 @@ class SubscriptionManager {
 
     /** Fängt nur RevenueCat-Fehler ab. Ein Coroutine-Abbruch läuft normal weiter. */
     private inline fun <T> revenueCatCall(block: () -> T): Result<T> =
-        try {
-            Result.success(block())
-        } catch (e: PurchasesException) {
-            Result.failure(e)
+        if (!Purchases.isConfigured) {
+            Result.failure(IllegalStateException("Käufe sind in dieser App-Version nicht eingerichtet."))
+        } else {
+            try {
+                Result.success(block())
+            } catch (e: PurchasesException) {
+                Result.failure(e)
+            }
         }
 }
