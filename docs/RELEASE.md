@@ -53,9 +53,12 @@ App in der Tuya IoT Platform: Paketname und SHA-256 eintragen, AppKey/AppSecret 
 
 ## 5a. Alpha-APK über GitHub (ohne Android Studio)
 
-1. Privates Repository anlegen und das Projekt hochladen (oder Claude mit verbundenem GitHub-Konto pushen lassen).
+1. Repository: `Soulcancer/green-ganja-grow-guardian` (privat).
 2. Unter *Actions* läuft **Android Alpha** bei jedem Push auf `main` oder per „Run workflow“.
-3. Nach dem Lauf unter *Artifacts* `grow-guardian-0.1.0-alpha-<Nr>` herunterladen: darin die APKs `play` und `direct`. Auf dem Handy installieren (Installation aus unbekannten Quellen erlauben).
+3. Nach jedem erfolgreichen Lauf auf `main` ersetzt der Workflow das Pre-Release **alpha**
+   (*Releases → Alpha 0.1.0 (Build N)*) mit den APKs `…-direct.apk` und `…-play.apk`. Auf dem Handy herunterladen und
+   installieren (Installation aus unbekannten Quellen erlauben). Zusätzlich liegen sie als Artefakt am Lauf.
+   Scheitert ein Lauf, stehen die Gradle-Fehler als Annotationen am Lauf (lesbar auch über die API).
 4. Ohne Secrets baut der Workflow trotzdem, aber mit Platzhaltern: Anmelden und Tuya-Geräte funktionieren dann nicht. Für eine nutzbare Alpha die Secrets `GOOGLE_SERVICES_JSON`, `TUYA_SECURITY_AAR_BASE64`, `TUYA_APPKEY`, `TUYA_APPSECRET` (und optional `REVENUECAT_KEY_DEBUG`) setzen.
 5. Die Alpha ist Debug-signiert und zeigt Googles Test-Anzeigen; sie ist nicht für den Play Store gedacht.
 
