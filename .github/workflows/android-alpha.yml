@@ -18,9 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -50,24 +50,31 @@ jobs:
             echo "::warning::Keine security-algorithm.aar: Tuya-Geräte funktionieren in dieser APK nicht"
           fi
 
-      - name: Unit-Tests
-        run: ./gradlew --no-daemon testPlayDebugUnitTest
-
-      - name: APKs bauen
+      # Tests und APKs in einem Lauf; --continue baut die APKs auch, wenn ein Test scheitert
+      - name: Unit-Tests und APKs
         env:
           VERSION_CODE: ${{ github.run_number }}
           TUYA_APPKEY: ${{ secrets.TUYA_APPKEY }}
           TUYA_APPSECRET: ${{ secrets.TUYA_APPSECRET }}
           REVENUECAT_KEY_DEBUG: ${{ secrets.REVENUECAT_KEY_DEBUG }}
-        run: ./gradlew --no-daemon assemblePlayDebug assembleDirectDebug
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --continue --stacktrace \
+            testPlayDebugUnitTest assemblePlayDebug assembleDirectDebug 2>&1 | tee build.log
+
+      - name: Fehler als Annotation
+        if: failure()
+        run: bash .github/ci/annotate-log.sh build.log
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: grow-guardian-0.1.0-alpha-${{ github.run_number }}
           path: |
             app/build/outputs/apk/play/debug/*.apk
             app/build/outputs/apk/direct/debug/*.apk
           retention-days: 30
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v4
         if: failure()
