@@ -1,0 +1,98 @@
+# Rollt Firestore-Regeln, Indizes und Cloud Functions aus. Anmeldung bei Google ohne Schlüssel
+# (Workload Identity Federation, eingerichtet von backend/setup-firebase.sh).
+#
+# Repository-Variablen (Settings → Secrets and variables → Actions → Variables):
+#   FIREBASE_PROJECT_ID, GCP_PROJECT_NUMBER   (Pflicht; ohne sie läuft der Workflow nicht)
+#   REVENUECAT_PROJECT_ID, TUYA_BASE_URL       (optional, sonst Werte aus functions/.env.example)
+# Optionale Secrets, die in den Secret Manager übernommen werden:
+#   REVENUECAT_SECRET_KEY, REVENUECAT_WEBHOOK_SECRET, TUYA_CLIENT_ID, TUYA_CLIENT_SECRET
+#   Fehlt eins, legt der Workflow es mit dem Platzhalter „nicht-gesetzt“ an; die Functions laufen dann ohne diese Funktion.
+name: Firebase Deploy
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**"]
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: "Auch Cloud Functions ausrollen (braucht den Blaze-Tarif)"
+        type: boolean
+        default: true
+
+concurrency: firebase-deploy
+
+jobs:
+  deploy:
+    if: vars.GCP_PROJECT_NUMBER != '' && vars.FIREBASE_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      P: ${{ vars.FIREBASE_PROJECT_ID }}
+      FIREBASE_CLI: npx --yes firebase-tools@latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ vars.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-deploy@${{ vars.FIREBASE_PROJECT_ID }}.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Abhängigkeiten
+        run: npm --prefix functions install
+
+      - name: Regeln und Indizes
+        run: |
+          set -o pipefail
+          $FIREBASE_CLI deploy --only firestore:rules,firestore:indexes --project "$P" --non-interactive --force 2>&1 | tee deploy.log
+
+      - name: Parameter und Secrets
+        if: github.event_name == 'push' || inputs.functions
+        env:
+          REVENUECAT_SECRET_KEY: ${{ secrets.REVENUECAT_SECRET_KEY }}
+          REVENUECAT_WEBHOOK_SECRET: ${{ secrets.REVENUECAT_WEBHOOK_SECRET }}
+          TUYA_CLIENT_ID: ${{ secrets.TUYA_CLIENT_ID }}
+          TUYA_CLIENT_SECRET: ${{ secrets.TUYA_CLIENT_SECRET }}
+          VAR_RC_PROJECT: ${{ vars.REVENUECAT_PROJECT_ID }}
+          VAR_TUYA_URL: ${{ vars.TUYA_BASE_URL }}
+        run: |
+          set -o pipefail
+          cp functions/.env.example functions/.env
+          [ -n "$VAR_RC_PROJECT" ] && sed -i "s|^REVENUECAT_PROJECT_ID=.*|REVENUECAT_PROJECT_ID=$VAR_RC_PROJECT|" functions/.env
+          [ -n "$VAR_TUYA_URL" ] && sed -i "s|^TUYA_BASE_URL=.*|TUYA_BASE_URL=$VAR_TUYA_URL|" functions/.env
+          for name in REVENUECAT_SECRET_KEY REVENUECAT_WEBHOOK_SECRET TUYA_CLIENT_ID TUYA_CLIENT_SECRET; do
+            value="${!name:-}"
+            if ! gcloud secrets describe "$name" --project "$P" >/dev/null 2>&1; then
+              gcloud secrets create "$name" --project "$P" --replication-policy=automatic >/dev/null
+              printf '%s' "${value:-nicht-gesetzt}" | gcloud secrets versions add "$name" --project "$P" --data-file=- >/dev/null
+              echo "$name angelegt$([ -z "$value" ] && echo ' (Platzhalter)')"
+            elif [ -n "$value" ] && [ "$(gcloud secrets versions access latest --secret "$name" --project "$P" 2>/dev/null)" != "$value" ]; then
+              printf '%s' "$value" | gcloud secrets versions add "$name" --project "$P" --data-file=- >/dev/null
+              echo "$name aktualisiert"
+            else
+              echo "$name unverändert"
+            fi
+          done 2>&1 | tee -a deploy.log
+
+      - name: Cloud Functions
+        if: github.event_name == 'push' || inputs.functions
+        run: |
+          set -o pipefail
+          deploy() { $FIREBASE_CLI deploy --only functions --project "$P" --non-interactive --force 2>&1 | tee -a deploy.log; }
+          # Beim ersten Ausrollen sind die Google-Dienstkonten oft noch nicht bereit: einmal nach 90 s wiederholen
+          deploy || { echo "Zweiter Versuch in 90 s"; sleep 90; deploy; }
+
+      - name: Fehler als Annotation
+        if: failure()
+        run: bash ../.github/ci/annotate-log.sh deploy.log

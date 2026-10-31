@@ -35,5 +35,16 @@ export const RC_WEBHOOK_SECRET = defineSecret("REVENUECAT_WEBHOOK_SECRET");
 /** Projekt-ID aus RevenueCat, z. B. "proj1ab2c3d4". */
 export const RC_PROJECT_ID = defineString("REVENUECAT_PROJECT_ID");
 
+/**
+ * Wert, mit dem der Deploy-Workflow fehlende Secrets anlegt, damit die Functions trotzdem ausrollen.
+ * Funktionen, die so ein Secret brauchen, überspringen ihre Arbeit oder melden einen Fehler.
+ */
+export const SECRET_PLACEHOLDER = "nicht-gesetzt";
+
+export function secretIsSet(value: string | undefined): boolean {
+  const v = (value ?? "").trim();
+  return v !== "" && v !== SECRET_PLACEHOLDER;
+}
+
 export const callOptions = { region: REGION, maxInstances: 10 };
 export const storeCallOptions = { ...callOptions, secrets: [RC_SECRET_KEY] };

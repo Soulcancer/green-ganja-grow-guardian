@@ -2,7 +2,7 @@ import { FieldValue, Timestamp, type QueryDocumentSnapshot } from "firebase-admi
 import { getMessaging } from "firebase-admin/messaging";
 import * as logger from "firebase-functions/logger";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { RC_SECRET_KEY, REGION } from "./config";
+import { RC_SECRET_KEY, REGION, secretIsSet } from "./config";
 import { db } from "./firebase";
 import { walletFrom } from "./rules/coins";
 import { sortBoxes, TIER_LIMITS, type Tier } from "./rules/grow";
@@ -204,6 +204,11 @@ export const serverMonitor = onSchedule(
     maxInstances: 1,
   },
   async () => {
+    // Ohne Tuya-Cloud-Zugang gibt es nichts zu überwachen (Alpha ohne Secrets)
+    if (!secretIsSet(TUYA_CLIENT_ID.value()) || !secretIsSet(TUYA_CLIENT_SECRET.value())) {
+      logger.info("Server-Überwachung aus: TUYA_CLIENT_ID/TUYA_CLIENT_SECRET nicht gesetzt");
+      return;
+    }
     const now = Date.now();
     const snap = await db().collectionGroup("growBoxes").get();
     // Nur eigene Boxen unter users/{uid}/growBoxes, nicht die geteilten Club-Boxen

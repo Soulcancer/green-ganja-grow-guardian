@@ -62,6 +62,21 @@ App in der Tuya IoT Platform: Paketname und SHA-256 eintragen, AppKey/AppSecret 
 4. Ohne Secrets baut der Workflow trotzdem, aber mit Platzhaltern: Anmelden und Tuya-Geräte funktionieren dann nicht. Für eine nutzbare Alpha die Secrets `GOOGLE_SERVICES_JSON`, `TUYA_SECURITY_AAR_BASE64`, `TUYA_APPKEY`, `TUYA_APPSECRET` (und optional `REVENUECAT_KEY_DEBUG`) setzen.
 5. Die Alpha ist Debug-signiert und zeigt Googles Test-Anzeigen; sie ist nicht für den Play Store gedacht.
 
+## 5b. Firebase einrichten (Cloud Shell, ohne lokale Werkzeuge)
+
+1. [Firebase-Konsole](https://console.firebase.google.com) → *Projekt erstellen*, Google Analytics aus. Die Projekt-ID merken.
+2. Für Cloud Functions (Club, Coins, Server-Alarme): *Tarif ändern* → **Blaze**. Ohne Blaze gehen Anmelden und Datenbank, aber keine Functions.
+3. [Cloud Shell](https://shell.cloud.google.com) öffnen, `backend/setup-firebase.sh` hochladen (⋮ → Hochladen) und starten:
+   `bash setup-firebase.sh <projekt-id>`
+   Das Skript legt Firestore (europe-west3), E-Mail-Anmeldung, die Android-App und eine schlüssellose Anmeldung für
+   GitHub Actions an (nur für dieses Repository, keine Schlüsseldateien).
+4. Die letzte Zeile (`GGG-FIREBASE projekt=… nummer=…`) als Repository-Variablen eintragen:
+   `FIREBASE_PROJECT_ID` und `GCP_PROJECT_NUMBER` (*Settings → Secrets and variables → Actions → Variables*).
+5. Danach holt **Android Alpha** die `google-services.json` selbst aus dem Projekt, und **Firebase Deploy**
+   (*Actions → Firebase Deploy → Run workflow*) rollt Regeln, Indizes und Functions aus.
+   Fehlende Secrets (RevenueCat, Tuya) legt der Workflow mit dem Platzhalter „nicht-gesetzt“ an; echte Werte als
+   GitHub-Secrets mit gleichem Namen eintragen und den Workflow neu starten.
+
 ## 6. Bauen
 
 1. `local.properties.example` → `local.properties` ausfüllen; Upload-Keystore erzeugen:

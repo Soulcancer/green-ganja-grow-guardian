@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: write # Alpha-Release mit den APKs
+      id-token: write # Google-Anmeldung ohne Schlüssel, um die Firebase-Konfiguration zu holen
     steps:
       - uses: actions/checkout@v5
 
@@ -29,13 +30,27 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Nach backend/setup-firebase.sh: Konfiguration direkt aus dem Firebase-Projekt holen
+      - id: gcp
+        if: vars.GCP_PROJECT_NUMBER != '' && vars.FIREBASE_PROJECT_ID != ''
+        continue-on-error: true
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ vars.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-deploy@${{ vars.FIREBASE_PROJECT_ID }}.iam.gserviceaccount.com
+          token_format: access_token
+
       - name: Firebase-Konfiguration
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          GCP_TOKEN: ${{ steps.gcp.outputs.access_token }}
+          P: ${{ vars.FIREBASE_PROJECT_ID }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
             echo "google-services.json aus Secret"
+          elif [ -n "$GCP_TOKEN" ] && bash .github/ci/fetch-google-services.sh "$P" "$GCP_TOKEN" app/google-services.json; then
+            echo "google-services.json aus Firebase-Projekt $P"
           else
             cp .github/ci/google-services.placeholder.json app/google-services.json
             echo "::warning::Kein GOOGLE_SERVICES_JSON-Secret: Platzhalter, Anmelden funktioniert in dieser APK nicht"
@@ -93,7 +108,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN: ${{ github.run_number }}
-          HAS_FIREBASE: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+          HAS_FIREBASE: ${{ secrets.GOOGLE_SERVICES_JSON != '' || steps.gcp.outputs.access_token != '' }}
           HAS_TUYA: ${{ secrets.TUYA_SECURITY_AAR_BASE64 != '' && secrets.TUYA_APPKEY != '' }}
           HAS_RC: ${{ secrets.REVENUECAT_KEY_DEBUG != '' }}
         run: |
