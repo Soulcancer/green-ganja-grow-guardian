@@ -50,7 +50,7 @@ fun AppNavigation(app: GrowGuardianApp) {
         onDispose { auth.removeAuthStateListener(listener) }
     }
     if (uid == null) {
-        SignInScreen(auth)
+        StartFlow(auth)
         return
     }
 
@@ -107,6 +107,23 @@ fun AppNavigation(app: GrowGuardianApp) {
             )
             AppTab.COINS -> RewardsScreen(app.wallets, app.subscriptions, app.ads, modifier = modifier)
             AppTab.ACCOUNT -> AccountScreen(app, onUpgradeClick = openPaywall, modifier = modifier)
+        }
+    }
+}
+
+private enum class StartPage { WELCOME, SIGN_IN, REGISTER }
+
+/** Ohne Login: erst die erklärende Startseite mit Hinweisen, dann Anmelden oder Registrieren. */
+@Composable
+private fun StartFlow(auth: FirebaseAuth) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val consent = remember { WelcomeConsent(context) }
+    var page by rememberSaveable { mutableStateOf(StartPage.WELCOME) }
+    when (page) {
+        StartPage.WELCOME -> WelcomeScreen(consent, onRegister = { page = StartPage.REGISTER }, onSignIn = { page = StartPage.SIGN_IN })
+        StartPage.SIGN_IN, StartPage.REGISTER -> {
+            BackHandler { page = StartPage.WELCOME }
+            SignInScreen(auth, initialRegister = page == StartPage.REGISTER, onBack = { page = StartPage.WELCOME })
         }
     }
 }

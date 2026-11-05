@@ -37,8 +37,8 @@ import kotlinx.coroutines.tasks.await
 
 /** Anmelden oder registrieren mit E-Mail und Passwort. Registrieren nur mit Bestätigung „ab 18“. */
 @Composable
-fun SignInScreen(auth: FirebaseAuth) {
-    var register by rememberSaveable { mutableStateOf(false) }
+fun SignInScreen(auth: FirebaseAuth, initialRegister: Boolean = false, onBack: (() -> Unit)? = null) {
+    var register by rememberSaveable { mutableStateOf(initialRegister) }
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var adult by rememberSaveable { mutableStateOf(false) }
@@ -53,6 +53,9 @@ fun SignInScreen(auth: FirebaseAuth) {
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (onBack != null) {
+            TextButton(onClick = onBack, enabled = !busy) { Text("← Zurück zur Startseite") }
+        }
         Text("Green Ganja Grow Guardian", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         Text(
             if (register) "Konto anlegen" else "Anmelden",
