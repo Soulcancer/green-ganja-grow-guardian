@@ -6,6 +6,7 @@ import de.greenganja.growguardian.billing.FarmerTier
 import de.greenganja.growguardian.billing.SubscriptionManager
 import de.greenganja.growguardian.grow.GrowAccess
 import de.greenganja.growguardian.grow.GrowBox
+import de.greenganja.growguardian.grow.GrowPhase
 import de.greenganja.growguardian.grow.GrowBoxRepository
 import de.greenganja.growguardian.grow.GrowBoxState
 import de.greenganja.growguardian.grow.Metric
@@ -79,6 +80,8 @@ class GrowViewModel(
     subscriptions: SubscriptionManager,
     private val automations: GrowAutomations? = null,
     wallet: Flow<Wallet>? = null,
+    /** Zum Löschen der Tagebuch-Einträge, wenn eine Pflanze entfernt wird. */
+    private val journal: de.greenganja.growguardian.grow.journal.JournalRepository? = null,
 ) : ViewModel() {
 
     private val retry = MutableStateFlow(0)
@@ -141,6 +144,24 @@ class GrowViewModel(
         act {
             repository.save(box.copy(alertsEnabled = enabled)).onSuccess {
                 events.send(GrowEvent.Message(if (enabled) "Alarme an." else "Alarme aus."))
+            }
+        }
+
+    /**
+     * Pflanze aus der Box nehmen (z. B. nach der Ernte): Sorte und Starttag leeren, auf Wunsch Phase auf Keimling
+     * und Tagebuch löschen. Box, Sensoren, Zielwerte, Verlauf und Automationen bleiben.
+     */
+    fun removePlant(box: GrowBox, deleteJournal: Boolean, resetPhase: Boolean) =
+        act {
+            val cleared = box.copy(
+                strain = null,
+                plantedAt = null,
+                phase = if (resetPhase) GrowPhase.SEEDLING else box.phase,
+            )
+            repository.save(cleared).mapCatching {
+                if (deleteJournal) journal?.deleteAll(box.id)
+            }.onSuccess {
+                events.send(GrowEvent.Message(if (deleteJournal) "Pflanze und Tagebuch entfernt." else "Pflanze entfernt. Das Tagebuch bleibt."))
             }
         }
 

@@ -1,5 +1,9 @@
 package de.greenganja.growguardian.grow.ui
 
+import de.greenganja.growguardian.grow.GrowBox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.MoreVert
 import de.greenganja.growguardian.ads.inlineAd
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -89,7 +93,7 @@ fun GrowScreen(
     journal: JournalRepository = remember { JournalRepository() },
     light: LightRepository = remember { LightRepository() },
     modifier: Modifier = Modifier,
-    viewModel: GrowViewModel = viewModel { GrowViewModel(repository, sensors, subscriptions, automations, wallet) },
+    viewModel: GrowViewModel = viewModel { GrowViewModel(repository, sensors, subscriptions, automations, wallet, journal) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -160,6 +164,7 @@ fun GrowScreen(
                             onSaveBox = viewModel::saveBox,
                             onMessage = { text -> scope.launch { snackbar.showSnackbar(text) } },
                             onBack = { route = ROUTE_BOX + boxId },
+                            onRemovePlant = { deleteJournal, resetPhase -> viewModel.removePlant(item.box, deleteJournal, resetPhase) },
                         )
                     }
                 }
@@ -233,6 +238,8 @@ fun GrowScreen(
                 }
                 else -> Overview(
                     state = state,
+                    onDelete = { viewModel.deleteBox(it.id) },
+                    onRemovePlant = viewModel::removePlant,
                     onOpen = { route = ROUTE_BOX + it },
                     onNew = { route = ROUTE_NEW },
                     onPair = pairing?.let { { route = ROUTE_PAIR } },
@@ -247,12 +254,32 @@ fun GrowScreen(
 @Composable
 private fun Overview(
     state: GrowUiState,
+    onDelete: (GrowBox) -> Unit,
+    onRemovePlant: (GrowBox, Boolean, Boolean) -> Unit,
     onOpen: (String) -> Unit,
     onNew: () -> Unit,
     onPair: (() -> Unit)?,
     onRetry: () -> Unit,
     onUpgradeClick: () -> Unit,
 ) {
+    var menuFor by remember { mutableStateOf<GrowBox?>(null) }
+    var deleting by remember { mutableStateOf<GrowBox?>(null) }
+    var removingPlant by remember { mutableStateOf<GrowBox?>(null) }
+    menuFor?.let { box ->
+        BoxActionsDialog(
+            box = box,
+            onOpen = { menuFor = null; onOpen(box.id) },
+            onRemovePlant = if (box.hasPlant) ({ menuFor = null; removingPlant = box }) else null,
+            onDelete = { menuFor = null; deleting = box },
+            onDismiss = { menuFor = null },
+        )
+    }
+    deleting?.let { box ->
+        DeleteDialog(name = box.name, onDismiss = { deleting = null }, onConfirm = { deleting = null; onDelete(box) })
+    }
+    removingPlant?.let { box ->
+        RemovePlantDialog(box, onDismiss = { removingPlant = null }, onConfirm = { journal, reset -> removingPlant = null; onRemovePlant(box, journal, reset) })
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -304,7 +331,7 @@ private fun Overview(
             item { EmptyBoxes(onNew) }
         }
         items(state.activeBoxes, key = { it.box.id }) { item ->
-            BoxRow(item, sensorsLoading = state.sensorsLoading, onClick = { onOpen(item.box.id) })
+            BoxRow(item, sensorsLoading = state.sensorsLoading, onClick = { onOpen(item.box.id) }, onMenu = { menuFor = item.box }, menuEnabled = !state.busy)
         }
         if (state.lockedBoxes.isNotEmpty()) {
             item {
@@ -314,7 +341,7 @@ private fun Overview(
                 Muted("Deine Stufe überwacht ${state.access.features.maxGrowBoxes} Box(en). Die übrigen bleiben gespeichert.")
             }
             items(state.lockedBoxes, key = { it.box.id }) { item ->
-                BoxRow(item, sensorsLoading = false, onClick = { onOpen(item.box.id) })
+                BoxRow(item, sensorsLoading = false, onClick = { onOpen(item.box.id) }, onMenu = { menuFor = item.box }, menuEnabled = !state.busy)
             }
         }
         inlineAd("grow-overview-end")
@@ -355,14 +382,14 @@ private fun LimitSummary(state: GrowUiState) {
 }
 
 @Composable
-private fun BoxRow(item: BoxItem, sensorsLoading: Boolean, onClick: () -> Unit) {
+private fun BoxRow(item: BoxItem, sensorsLoading: Boolean, onClick: () -> Unit, onMenu: () -> Unit, menuEnabled: Boolean) {
     val box = item.box
     GrowCard(onClick = onClick) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 0.dp), verticalAlignment = Alignment.CenterVertically) {
             IconBadge(if (item.locked) Icons.Filled.Lock else Icons.Filled.Spa, tint = if (item.locked) GrowPalette.TextMuted else GrowPalette.Green, size = 48)
             Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(text = box.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                Muted("${box.phase.label} · ${box.medium.label}")
+                Muted(listOfNotNull(box.strain?.takeIf { it.isNotBlank() }, box.phase.label, box.medium.label).joinToString(" · "), maxLines = 1)
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 when {
@@ -375,6 +402,9 @@ private fun BoxRow(item: BoxItem, sensorsLoading: Boolean, onClick: () -> Unit) 
                     item.state.reading(Metric.AIR_HUMIDITY)?.formatted,
                 ).joinToString(" · ")
                 if (summary.isNotEmpty()) Muted(summary, color = MaterialTheme.colorScheme.onSurface)
+            }
+            IconButton(onClick = onMenu, enabled = menuEnabled) {
+                Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Aktionen für ${box.name}")
             }
         }
     }

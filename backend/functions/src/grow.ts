@@ -1,7 +1,7 @@
 import { FieldValue, type DocumentData, type Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { onCall } from "firebase-functions/v2/https";
-import { requireUid } from "./access";
+import { getMembership, requireUid } from "./access";
 import { storeCallOptions } from "./config";
 import { fail } from "./errors";
 import { db } from "./firebase";
@@ -95,8 +95,25 @@ export const deleteGrowBox = onCall(storeCallOptions, async (request) => {
   const uid = requireUid(request);
   const boxId = (request.data as { boxId?: unknown } | null)?.boxId;
   if (typeof boxId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(boxId)) fail("invalid-argument", "invalid-input", "Ungültige Box.");
-  // Box samt Verlauf und Statistik löschen
+  // Box samt Verlauf, Statistik, Tagebuch und Lichtmessungen löschen
   await db().recursiveDelete(boxesRef(uid).doc(boxId));
   await deleteAutomationsOfBox(uid, boxId);
-  return { ok: true };
+  const removedClubBoxes = await deleteSharedCopies(uid, boxId);
+  return { ok: true, removedClubBoxes };
 });
+
+/** Für den Club geteilte Ansichten der Box enden mit ihr (sonst blieben verwaiste Club-Boxen stehen). */
+async function deleteSharedCopies(uid: string, boxId: string): Promise<number> {
+  const membership = await getMembership(uid);
+  if (!membership) return 0;
+  try {
+    const shared = await db().collection(`clubs/${membership.clubId}/growBoxes`).where("keeperUid", "==", uid).get();
+    const copies = shared.docs.filter((d) => d.get("sourceBoxId") === boxId);
+    await Promise.all(copies.map((d) => db().recursiveDelete(d.ref)));
+    return copies.length;
+  } catch (error) {
+    // Die eigene Box ist schon gelöscht; eine übrig gebliebene Club-Ansicht kann das Team von Hand beenden
+    logger.warn("Geteilte Club-Box nicht entfernt", { uid, boxId, error: String(error) });
+    return 0;
+  }
+}

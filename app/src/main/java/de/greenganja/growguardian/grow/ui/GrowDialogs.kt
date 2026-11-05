@@ -19,12 +19,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import de.greenganja.growguardian.grow.DefaultTargets
 import de.greenganja.growguardian.grow.GrowBox
+import de.greenganja.growguardian.grow.GrowPhase
 import de.greenganja.growguardian.grow.Metric
 import de.greenganja.growguardian.grow.TargetRange
 import de.greenganja.growguardian.ui.theme.GrowPalette
@@ -172,10 +176,81 @@ private fun NumberField(label: String, value: String, onChange: (String) -> Unit
 internal fun DeleteDialog(name: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("$name löschen?") },
-        text = { Text("Die Box und ihre Zielwerte werden gelöscht. Die Sensoren bleiben in deinem Konto.") },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Löschen", color = MaterialTheme.colorScheme.error) } },
+        title = { Text("„$name“ löschen?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Gelöscht werden die Box mit Pflanze, Zielwerten, Verlauf, Tagebuch, Lichtmessungen und Automationen. Für den Club geteilte Ansichten der Box enden.")
+                Text("Deine Sensoren bleiben im Konto und lassen sich einer anderen Box zuordnen.")
+                Text("Das lässt sich nicht rückgängig machen.", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Box löschen", color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+    )
+}
+
+/** Hat die Box eine Pflanze (Sorte oder Starttag)? */
+internal val GrowBox.hasPlant: Boolean get() = !strain.isNullOrBlank() || plantedAt != null
+
+internal fun GrowBox.plantLabel(): String = strain?.takeIf { it.isNotBlank() } ?: "Pflanze ohne Sorte"
+
+/**
+ * Pflanze aus der Box entfernen, z. B. nach der Ernte: Sorte und Starttag weg, die Box mit Sensoren,
+ * Zielwerten, Verlauf und Automationen bleibt. Tagebuch nur auf Wunsch.
+ */
+@Composable
+internal fun RemovePlantDialog(box: GrowBox, onDismiss: () -> Unit, onConfirm: (deleteJournal: Boolean, resetPhase: Boolean) -> Unit) {
+    var deleteJournal by remember { mutableStateOf(false) }
+    var resetPhase by remember { mutableStateOf(true) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("„${box.plantLabel()}“ entfernen?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Sorte und Starttag werden aus „${box.name}“ entfernt. Box, Sensoren, Zielwerte, Verlauf und Automationen bleiben, du kannst gleich eine neue Pflanze eintragen.")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = resetPhase, onCheckedChange = { resetPhase = it })
+                    Text("Phase auf „${GrowPhase.SEEDLING.label}“ zurücksetzen")
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = deleteJournal, onCheckedChange = { deleteJournal = it })
+                    Text("Tagebuch-Einträge auch löschen")
+                }
+                if (deleteJournal) Text("Die Einträge sind danach weg.", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(deleteJournal, resetPhase) }) { Text("Pflanze entfernen", color = MaterialTheme.colorScheme.error) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+    )
+}
+
+/** Aktionen zu einer Box aus der Übersicht. */
+@Composable
+internal fun BoxActionsDialog(
+    box: GrowBox,
+    onOpen: () -> Unit,
+    onRemovePlant: (() -> Unit)?,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(box.name) },
+        text = {
+            Column {
+                TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text("Öffnen", modifier = Modifier.fillMaxWidth()) }
+                if (onRemovePlant != null) {
+                    TextButton(onClick = onRemovePlant, modifier = Modifier.fillMaxWidth()) {
+                        Text("Pflanze entfernen („${box.plantLabel()}“)", modifier = Modifier.fillMaxWidth())
+                    }
+                }
+                TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
+                    Text("Box löschen", color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth())
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Schließen") } },
     )
 }
 

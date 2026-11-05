@@ -116,6 +116,17 @@ class JournalRepository(
     suspend fun delete(boxId: String, entryId: String) {
         collection(boxId)?.document(entryId)?.delete()?.await()
     }
+
+    /** Alle Einträge einer Box löschen, in Paketen zu höchstens 400 (Grenze eines Batches: 500). */
+    suspend fun deleteAll(boxId: String) {
+        val ref = collection(boxId) ?: error("Nicht angemeldet")
+        val docs = ref.get().await().documents
+        for (chunk in docs.chunked(400)) {
+            val batch = db.batch()
+            chunk.forEach { batch.delete(it.reference) }
+            batch.commit().await()
+        }
+    }
 }
 
 internal fun DocumentSnapshot.toJournalEntry(): JournalEntry? {

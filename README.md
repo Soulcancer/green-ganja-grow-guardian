@@ -286,6 +286,11 @@ Premium und Social Club können Steckdosen und Schaltleisten automatisch schalte
 - **Voraussetzung:** Der Sensor muss online sein und seine Werte an die Tuya-Cloud melden. Geräte, die nur lokal (Bluetooth) verbunden sind, lösen keine Cloud-Automation aus.
 - **Steckdosen:** Als schaltbar gelten Bool-Datenpunkte mit dem Code `switch` oder `switch_<n>` (Steckdosenleisten zeigen „Dose n“). Eigene Codes erkennt `DpMapping.isSwitchCode` nicht.
 
+### Boxen und Pflanzen löschen
+
+- **Box löschen:** in der Übersicht über ⋮ an jeder Box (auch an gesperrten) oder in der Box-Ansicht über den Papierkorb oben. `deleteGrowBox` löscht die Box mit Verlauf, Statistik, Tagebuch und Lichtmessungen (`recursiveDelete`), ihre Automationen und für den Club geteilte Ansichten der Box. Die Sensoren bleiben im Konto; nach dem Löschen einer aktiven Box rückt eine gesperrte nach.
+- **Pflanze entfernen** (z. B. nach der Ernte): Sorte und Starttag werden geleert, auf Wunsch Phase zurück auf „Keimling / Steckling“ und alle Tagebuch-Einträge gelöscht (`JournalRepository.deleteAll`, in Paketen zu 400). Box, Sensoren, Zielwerte, Verlauf und Automationen bleiben. Erreichbar über ⋮ in der Übersicht, die Pflanzen-Karte in der Box-Ansicht und das Tagebuch.
+
 ### Grow-Tagebuch
 
 Je Box: Sorte und Starttag (daraus „Tag 30 · Woche 5, Tag 2“), dazu Einträge mit gegossen, Wassermenge, Dünger, von Hand gemessenen Werten (z. B. pH aus dem Tropfentest) und Notizen. Für alle Stufen. Gespeichert unter `users/{uid}/growBoxes/{boxId}/journal`; die App schreibt direkt, die Firestore-Regeln prüfen das Format. Die Einträge sind in „Meine Daten herunterladen“ enthalten und werden beim Löschen der Box oder des Kontos mitgelöscht.

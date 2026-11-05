@@ -100,11 +100,13 @@ internal fun JournalScreen(
     onSaveBox: (GrowBox) -> Unit,
     onMessage: (String) -> Unit,
     onBack: () -> Unit,
+    onRemovePlant: ((deleteJournal: Boolean, resetPhase: Boolean) -> Unit)? = null,
 ) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<JournalEntry?>(null) }
     var editBox by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<JournalEntry?>(null) }
+    var removing by remember { mutableStateOf(false) }
     val today = viewModel.today()
 
     LaunchedEffect(viewModel) { viewModel.messages.collect(onMessage) }
@@ -136,7 +138,12 @@ internal fun JournalScreen(
                             ).joinToString(" · "),
                         )
                         JournalRules.lastWatered(entries.orEmpty())?.let { Muted("Zuletzt gegossen: ${formatDate(it)}") }
-                        TextButton(onClick = { editBox = true }) { Text("Sorte und Start bearbeiten") }
+                        Row {
+                            TextButton(onClick = { editBox = true }) { Text("Sorte und Start bearbeiten") }
+                            if (box.hasPlant && onRemovePlant != null) {
+                                TextButton(onClick = { removing = true }) { Text("Pflanze entfernen", color = MaterialTheme.colorScheme.error) }
+                            }
+                        }
                     }
                 }
             }
@@ -191,6 +198,12 @@ internal fun JournalScreen(
             },
             dismissButton = { TextButton(onClick = { editBox = false }) { Text("Abbrechen") } },
         )
+    }
+    if (removing && onRemovePlant != null) {
+        RemovePlantDialog(box, onDismiss = { removing = false }, onConfirm = { deleteJournal, resetPhase ->
+            removing = false
+            onRemovePlant(deleteJournal, resetPhase)
+        })
     }
     deleting?.let { entry ->
         AlertDialog(

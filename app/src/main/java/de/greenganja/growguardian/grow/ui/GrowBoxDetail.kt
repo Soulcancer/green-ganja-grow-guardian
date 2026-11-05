@@ -27,6 +27,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Edit
+import de.greenganja.growguardian.grow.journal.JournalRules
+import androidx.compose.material.icons.filled.Spa
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.Button
@@ -54,6 +57,7 @@ private const val DIALOG_EDIT = "edit"
 private const val DIALOG_DEVICES = "devices"
 private const val DIALOG_TARGETS = "targets"
 private const val DIALOG_DELETE = "delete"
+private const val DIALOG_REMOVE_PLANT = "remove-plant"
 
 /** Detailansicht einer Box: Kacheln, alle Messwerte mit Zielbereich, Sensoren und Zielwerte. */
 @Composable
@@ -92,6 +96,9 @@ internal fun BoxDetail(
                     Icon(imageVector = Icons.Filled.Edit, contentDescription = "Bearbeiten")
                 }
             }
+            IconButton(onClick = { dialog = DIALOG_DELETE }, enabled = !state.busy) {
+                Icon(imageVector = Icons.Filled.Delete, contentDescription = "Box löschen")
+            }
         }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -103,6 +110,22 @@ internal fun BoxDetail(
                     Muted("${box.phase.label} · ${box.medium.label}", modifier = Modifier.weight(1f))
                     if (item.locked) StatusChip("Gesperrt", GrowPalette.TextMuted)
                     else StatusChip(item.state.status.label, item.state.status.color)
+                }
+            }
+            if (box.hasPlant) {
+                item {
+                    GrowCard {
+                        Row(modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            IconBadge(Icons.Filled.Spa, size = 34)
+                            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                Text(box.plantLabel(), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                val today = java.time.LocalDate.now(java.time.ZoneId.of("Europe/Berlin")).toString()
+                                val day = JournalRules.growDay(box.plantedAt, today)
+                                Muted(listOfNotNull(box.plantedAt?.let { "Start $it" }, day?.let { "Tag $it · ${JournalRules.weekLabel(it)}" }).joinToString(" · ").ifEmpty { "Ohne Starttag" })
+                            }
+                            if (!item.locked) PillAction("Entfernen", onClick = { dialog = DIALOG_REMOVE_PLANT }, enabled = !state.busy)
+                        }
+                    }
                 }
             }
             inlineAd("box-detail-top")
@@ -228,6 +251,14 @@ internal fun BoxDetail(
             onDismiss = { dialog = null },
             onConfirm = { targets ->
                 viewModel.setTargets(box, targets)
+                dialog = null
+            },
+        )
+        DIALOG_REMOVE_PLANT -> RemovePlantDialog(
+            box = box,
+            onDismiss = { dialog = null },
+            onConfirm = { deleteJournal, resetPhase ->
+                viewModel.removePlant(box, deleteJournal, resetPhase)
                 dialog = null
             },
         )

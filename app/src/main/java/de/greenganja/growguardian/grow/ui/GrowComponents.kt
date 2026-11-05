@@ -173,8 +173,13 @@ internal fun PillAction(text: String, onClick: () -> Unit, enabled: Boolean = tr
 }
 
 @Composable
-internal fun Muted(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
-    Text(text = text, modifier = modifier, style = MaterialTheme.typography.bodySmall, color = color)
+internal fun Muted(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    maxLines: Int = Int.MAX_VALUE,
+) {
+    Text(text = text, modifier = modifier, style = MaterialTheme.typography.bodySmall, color = color, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
 }
 
 /** Große Kachel für Temperatur, Luftfeuchte und VPD. */
