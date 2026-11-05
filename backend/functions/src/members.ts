@@ -32,7 +32,8 @@ function plain(value: unknown): unknown {
 
 /**
  * Auskunft über alle eigenen Daten (Art. 15 DSGVO): Club-Zugehörigkeit, Mitglieds-Eintrag, Reservierungen,
- * dokumentierte Abgaben an dich, eigene Grow-Boxen, Automationen und Marktplatz-Inserate.
+ * dokumentierte Abgaben an dich, Moderations-Einträge über dich und von dir, eigene Grow-Boxen, Automationen
+ * und Marktplatz-Inserate.
  * Der Verlauf der Messwerte ist ausgenommen (zu groß); er lässt sich in der Analyse ansehen.
  */
 export const exportMyData = onCall(callOptions, async (request) => {
@@ -42,16 +43,20 @@ export const exportMyData = onCall(callOptions, async (request) => {
 
   if (membership) {
     const clubRef = db().doc(`clubs/${membership.clubId}`);
-    const [member, reservations, dispensations, listings] = await Promise.all([
+    const [member, reservations, dispensations, listings, aboutMe, byMe] = await Promise.all([
       clubRef.collection("members").doc(uid).get(),
       clubRef.collection("reservations").where("memberUid", "==", uid).get(),
       clubRef.collection("dispensations").where("memberUid", "==", uid).get(),
       clubRef.collection("listings").where("sellerUid", "==", uid).get(),
+      clubRef.collection("modLog").where("targetUid", "==", uid).get(),
+      clubRef.collection("modLog").where("byUid", "==", uid).get(),
     ]);
     result.member = plain(member.data() ?? null);
     result.reservations = reservations.docs.map((d) => ({ id: d.id, ...(plain(d.data()) as object) }));
     result.dispensations = dispensations.docs.map((d) => ({ id: d.id, ...(plain(d.data()) as object) }));
     result.marketplaceListings = listings.docs.map((d) => ({ id: d.id, ...(plain(d.data()) as object) }));
+    result.moderationAboutYou = aboutMe.docs.map((d) => ({ id: d.id, ...(plain(d.data()) as object) }));
+    result.moderationByYou = byMe.docs.map((d) => ({ id: d.id, ...(plain(d.data()) as object) }));
   }
 
   const [boxes, automations] = await Promise.all([

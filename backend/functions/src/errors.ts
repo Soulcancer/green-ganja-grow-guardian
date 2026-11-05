@@ -35,7 +35,11 @@ export type Reason =
   | "insufficient-coins"
   | "not-needed"
   | "lamps-premium"
-  | "email-not-verified";
+  | "email-not-verified"
+  | "not-moderator"
+  | "moderator-limit"
+  | "market-blocked"
+  | "announcement-limit";
 
 /** Wirft einen Fehler mit deutscher Meldung, die die App direkt anzeigen kann. */
 export function fail(

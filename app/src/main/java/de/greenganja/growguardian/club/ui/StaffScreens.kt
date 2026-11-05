@@ -35,6 +35,7 @@ import de.greenganja.growguardian.club.ClubMember
 import de.greenganja.growguardian.club.ClubRole
 import de.greenganja.growguardian.club.Dispensation
 import de.greenganja.growguardian.club.MemberStatus
+import de.greenganja.growguardian.club.ModerationRules
 import de.greenganja.growguardian.club.Reservation
 import de.greenganja.growguardian.club.ReservationStatus
 
@@ -46,7 +47,14 @@ private data class HandoutTarget(val member: ClubMember?, val reservation: Reser
 /** Bereich für Inhaber und Team mit vier Reitern. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun StaffContent(state: ClubUiState, viewModel: ClubViewModel, onUpgradeClick: () -> Unit, onOpenMarket: (() -> Unit)? = null) {
+internal fun StaffContent(
+    state: ClubUiState,
+    viewModel: ClubViewModel,
+    onUpgradeClick: () -> Unit,
+    onOpenMarket: (() -> Unit)? = null,
+    /** Moderations-Reiter; null = ausgeblendet. */
+    moderation: (@Composable () -> Unit)? = null,
+) {
     var tab by rememberSaveable { mutableStateOf(0) }
     val club = state.club
     // In der Play-Store-Fassung ohne Anfragen (Reservierungen) und Abgabe-Doku
@@ -55,6 +63,7 @@ internal fun StaffContent(state: ClubUiState, viewModel: ClubViewModel, onUpgrad
         StaffTab.MEMBERS,
         StaffTab.DOCS.takeIf { state.dispensing },
         StaffTab.BOXES,
+        StaffTab.MODERATION.takeIf { moderation != null },
         StaffTab.CLUB,
     )
     val current = tabs.getOrElse(tab) { tabs.first() }
@@ -64,6 +73,7 @@ internal fun StaffContent(state: ClubUiState, viewModel: ClubViewModel, onUpgrad
             StaffTab.MEMBERS -> if (state.pendingMembers.isEmpty()) "Mitglieder" else "Mitglieder (${state.pendingMembers.size})"
             StaffTab.DOCS -> "Doku"
             StaffTab.BOXES -> if (state.clubBoxes.isEmpty()) "Boxen" else "Boxen (${state.clubBoxes.size})"
+            StaffTab.MODERATION -> "Moderation"
             StaffTab.CLUB -> "Club"
         }
     }
@@ -86,12 +96,13 @@ internal fun StaffContent(state: ClubUiState, viewModel: ClubViewModel, onUpgrad
             StaffTab.MEMBERS -> MembersTab(state, viewModel)
             StaffTab.DOCS -> DocumentationTab(state, viewModel)
             StaffTab.BOXES -> ClubBoxesTab(state, viewModel)
+            StaffTab.MODERATION -> moderation?.invoke()
             StaffTab.CLUB -> ClubTab(state, viewModel)
         }
     }
 }
 
-private enum class StaffTab { REQUESTS, MEMBERS, DOCS, BOXES, CLUB }
+private enum class StaffTab { REQUESTS, MEMBERS, DOCS, BOXES, MODERATION, CLUB }
 
 @Composable
 private fun InactiveBanner(isOwner: Boolean, onUpgradeClick: () -> Unit) {
@@ -199,6 +210,7 @@ private fun MembersTab(state: ClubUiState, viewModel: ClubViewModel) {
     var approving by remember { mutableStateOf<ClubMember?>(null) }
     var removing by remember { mutableStateOf<ClubMember?>(null) }
     var confirmRotate by remember { mutableStateOf(false) }
+    var appointing by remember { mutableStateOf<ClubMember?>(null) }
     val club = state.club
 
     LazyColumn(
@@ -235,11 +247,20 @@ private fun MembersTab(state: ClubUiState, viewModel: ClubViewModel) {
             }
         }
         item { SectionTitle("Mitglieder (${state.activeMembers.size})") }
+        if (state.moderationAvailable) {
+            item { Hint("Moderatoren (${state.moderators.size} von ${ModerationRules.MAX_MODERATORS}) entscheiden Meldungen, verwarnen, sperren im Marktplatz und schreiben Ankündigungen. Sie belegen keinen Team-Platz und sehen keine Personendaten.") }
+        }
         items(state.activeMembers, key = { "active-${it.uid}" }) { member ->
             MemberCard(member) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (member.role == ClubRole.MEMBER) {
+                    if (member.role == ClubRole.MEMBER || member.role == ClubRole.MODERATOR) {
                         TextButton(onClick = { removing = member }, enabled = !state.busy) { Text("Entfernen") }
+                    }
+                    if (state.moderationAvailable && (member.role == ClubRole.MEMBER || member.role == ClubRole.MODERATOR)) {
+                        val full = member.role == ClubRole.MEMBER && state.moderators.size >= ModerationRules.MAX_MODERATORS
+                        TextButton(onClick = { appointing = member }, enabled = !state.busy && !full) {
+                            Text(if (member.role == ClubRole.MODERATOR) "Abberufen" else "Moderator")
+                        }
                     }
                     if (!member.hasProfile) {
                         OutlinedButton(onClick = { approving = member }, enabled = !state.busy) { Text("Daten eintragen") }
@@ -276,6 +297,24 @@ private fun MembersTab(state: ClubUiState, viewModel: ClubViewModel) {
                 viewModel.removeMember(member.uid)
             },
             onDismiss = { removing = null },
+        )
+    }
+    appointing?.let { member ->
+        val dismiss = member.role == ClubRole.MODERATOR
+        ConfirmDialog(
+            title = if (dismiss) "${member.fullName} abberufen?" else "${member.fullName} zum Moderator ernennen?",
+            text = if (dismiss) {
+                "Die Person bleibt Mitglied, verliert aber den Reiter Moderation."
+            } else {
+                "Moderatoren entscheiden Meldungen, verwarnen, sperren im Marktplatz und schreiben Ankündigungen. " +
+                    "Sie sehen nur Anzeigenamen und belegen keinen Team-Platz."
+            },
+            confirmLabel = if (dismiss) "Abberufen" else "Ernennen",
+            onConfirm = {
+                appointing = null
+                viewModel.setModerator(member.uid, !dismiss)
+            },
+            onDismiss = { appointing = null },
         )
     }
     if (confirmRotate) {
@@ -382,6 +421,7 @@ private fun ClubTab(state: ClubUiState, viewModel: ClubViewModel) {
     var removingStaff by remember { mutableStateOf<ClubMember?>(null) }
     var confirmLeave by remember { mutableStateOf(false) }
     val me = state.me
+    val now = remember(state.notices, state.announcements) { System.currentTimeMillis() }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -426,6 +466,7 @@ private fun ClubTab(state: ClubUiState, viewModel: ClubViewModel) {
             }
         }
         inlineAd("staff-club-top")
+        clubNewsItems(state.announcements, state.notices, now)
 
         if (state.dispensing) item { SectionTitle("Eigene Reservierung") }
         if (!state.dispensing) {

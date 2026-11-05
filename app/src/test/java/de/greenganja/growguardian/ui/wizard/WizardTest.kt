@@ -61,6 +61,10 @@ class WizardTest {
         assertEquals(ClubWizardRole.OWNER, ClubWizardRole.of(m(ClubRole.OWNER)))
         assertEquals(ClubWizardRole.STAFF, ClubWizardRole.of(m(ClubRole.STAFF)))
         assertEquals(ClubWizardRole.MEMBER, ClubWizardRole.of(m(ClubRole.MEMBER)))
+        assertEquals(ClubWizardRole.MODERATOR, ClubWizardRole.of(m(ClubRole.MODERATOR)))
+        val moderator = ClubWizardContent.pages(ClubWizardRole.MODERATOR, true).map { it.key }
+        assertTrue("club-mod-reports" in moderator && "club-mod-members" in moderator)
+        assertTrue("club-moderators" in ClubWizardContent.pages(ClubWizardRole.STAFF, true).map { it.key })
 
         val member = ClubWizardContent.pages(ClubWizardRole.MEMBER, dispensing = true).map { it.key }
         assertTrue("club-reserve" in member)

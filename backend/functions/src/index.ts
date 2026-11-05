@@ -3,6 +3,8 @@
  *
  * Club und Team-Plätze:  createClub, createStaffInvite, joinClub, leaveClub, removeStaff
  * Mitglieder:            approveMember, removeMember, rotateMemberCode
+ * Moderation:           setModerator, moderationOverview, warnMember, blockMarket, unblockMarket, decideReport,
+ *                        postAnnouncement, deleteAnnouncement
  * Reservierungen:        requestReservation, updateReservation, cancelReservation, decideReservation
  * Mitglieder:            updateMemberSettings, exportMyData
  * Konto:                 deleteMyAccount
@@ -29,6 +31,16 @@ export { deleteMyAccount } from "./account";
 export { serverMonitor } from "./serverMonitor";
 export { admobRewardCallback, claimAchievements, dailyCheckIn, redeemCoins } from "./coins";
 export { exportMyData, updateMemberSettings } from "./members";
+export {
+  blockMarket,
+  decideReport,
+  deleteAnnouncement,
+  moderationOverview,
+  postAnnouncement,
+  setModerator,
+  unblockMarket,
+  warnMember,
+} from "./moderation";
 export {
   cancelPropagation,
   createListing,

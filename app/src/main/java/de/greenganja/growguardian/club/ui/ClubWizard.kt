@@ -16,6 +16,7 @@ enum class ClubWizardRole(val key: String, val title: String) {
     NONE("none", "Social Club"),
     PENDING("pending", "Dein Aufnahmeantrag"),
     MEMBER("member", "Club für Mitglieder"),
+    MODERATOR("moderator", "Club-Moderation"),
     STAFF("staff", "Club-Team"),
     OWNER("owner", "Club-Inhaber"),
     ;
@@ -26,6 +27,7 @@ enum class ClubWizardRole(val key: String, val title: String) {
             membership.isPending -> PENDING
             membership.role == ClubRole.OWNER -> OWNER
             membership.role == ClubRole.STAFF -> STAFF
+            membership.role == ClubRole.MODERATOR -> MODERATOR
             else -> MEMBER
         }
     }
@@ -87,6 +89,28 @@ object ClubWizardContent {
                     "Du bestimmst, unter welchem Namen dich andere sehen, welche Benachrichtigungen du bekommst, und kannst deine Daten jederzeit herunterladen.",
                 ),
             )
+            ClubWizardRole.MODERATOR -> listOf(
+                WizardPage(
+                    "club-mod-role", "Du moderierst den Club",
+                    "Das Team hat dich zum Moderator ernannt. Du bleibst Mitglied und bekommst zusätzlich den Reiter „Moderation“.",
+                    listOf("Du siehst nur Anzeigenamen, keine Ausweisdaten, Geburtsdaten oder Abgaben.", "Freigaben, Reservierungen und die Abgabe-Doku bleiben beim Team."),
+                ),
+                WizardPage(
+                    "club-mod-reports", "Meldungen entscheiden",
+                    "Gemeldete Inserate sind ab 3 Meldungen ausgeblendet. Du gibst sie wieder frei oder entfernst sie, gern mit Grund.",
+                    listOf("Club-Angebote für Samen und Stecklinge entscheidet das Team.", "Cannabis selbst hat im Marktplatz nichts zu suchen."),
+                ),
+                WizardPage(
+                    "club-mod-members", "Verwarnen und sperren",
+                    "Bei Regelverstößen verwarnst du Mitglieder oder sperrst sie für 1, 3, 7 oder 30 Tage im Marktplatz.",
+                    listOf("Ein Grund ist Pflicht; die Person sieht ihn unter „Hinweise vom Club“.", "Team-Mitglieder und andere Moderatoren regelt das Team."),
+                ),
+                WizardPage(
+                    "club-mod-news", "Ankündigungen und Protokoll",
+                    "Ankündigungen erreichen alle Mitglieder für 30 Tage, bis zu 3 lassen sich anheften. Jede Aktion steht im Protokoll.",
+                    listOf("Nur intern für Mitglieder: keine Werbung nach außen (§ 6 KCanG)."),
+                ),
+            )
             ClubWizardRole.STAFF, ClubWizardRole.OWNER -> listOfNotNull(
                 intro,
                 WizardPage(
@@ -107,6 +131,11 @@ object ClubWizardContent {
                     "club-offers", "Angebote und Vermehrungsmaterial",
                     "Im Marktplatz stellt das Team Samen und Stecklinge als Club-Angebot ein und entscheidet über Anfragen der Mitglieder.",
                 ).takeIf { dispensing },
+                WizardPage(
+                    "club-moderators", "Moderatoren",
+                    "Ernenne aktive Mitglieder zu Moderatoren. Sie entscheiden Meldungen, verwarnen, sperren im Marktplatz und schreiben Ankündigungen.",
+                    listOf("Bis zu 10 je Club, ohne Team-Platz und ohne Zugriff auf Personendaten.", "Alles steht im Protokoll im Reiter „Moderation“."),
+                ),
                 WizardPage(
                     "club-seats", "Team und Einstellungen",
                     "Der Inhaber vergibt die 5 Team-Plätze über Einladungs-Codes und kann den Mitglieds-Code erneuern, wenn er weitergegeben wurde.",

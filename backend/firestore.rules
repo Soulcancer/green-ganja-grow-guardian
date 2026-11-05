@@ -15,6 +15,12 @@ service cloud.firestore {
         && request.auth.uid in get(/databases/$(database)/documents/clubs/$(clubId)).data.staffUids;
     }
 
+    // Moderatoren: aktive Mitglieder mit Moderations-Werkzeugen, ohne Team-Platz (Liste pflegen nur die Functions)
+    function isModerator(clubId) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/clubs/$(clubId)).data.get('moderatorUids', []);
+    }
+
     function isActiveMember(clubId) {
       return signedIn()
         && exists(/databases/$(database)/documents/memberships/$(request.auth.uid))
@@ -66,7 +72,7 @@ service cloud.firestore {
         }
 
         match /reports/{reportUid} {
-          allow read: if isStaff(clubId);
+          allow read: if isStaff(clubId) || isModerator(clubId);
         }
       }
 
@@ -76,6 +82,17 @@ service cloud.firestore {
 
       match /propagationLog/{entryId} {
         allow read: if isStaff(clubId);
+      }
+
+      // Ankündigungen von Team und Moderation: jedes aktive Mitglied
+      match /announcements/{announcementId} {
+        allow read: if isStaff(clubId) || isActiveMember(clubId);
+      }
+
+      // Moderations-Protokoll: Team und Moderatoren; jede Person sieht die Einträge über sich (mit Grund)
+      match /modLog/{entryId} {
+        allow read: if isStaff(clubId) || isModerator(clubId)
+          || (signedIn() && resource.data.targetUid == request.auth.uid);
       }
 
       // Abgabe-Dokumentation nach § 26 KCanG: nur das Team

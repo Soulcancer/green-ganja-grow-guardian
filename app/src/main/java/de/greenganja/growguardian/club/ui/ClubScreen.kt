@@ -18,8 +18,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -44,6 +47,7 @@ import de.greenganja.growguardian.club.ClubBoxPrefs
 import de.greenganja.growguardian.club.ClubBoxRepository
 import de.greenganja.growguardian.club.ClubRepository
 import de.greenganja.growguardian.club.MarketRepository
+import de.greenganja.growguardian.club.ModerationRepository
 import de.greenganja.growguardian.club.Reservation
 import de.greenganja.growguardian.club.ReservationStatus
 import de.greenganja.growguardian.grow.GrowBox
@@ -60,8 +64,9 @@ private val UTF8_BOM = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
  * Einstieg in den Club-Bereich. Zeigt je nach Rolle:
  * - ohne Club: Code einlösen oder (mit Social-Club-Abo) Club gründen
  * - Antrag offen: Hinweis auf die Freigabe im Club
- * - Mitglied: Reservieren und eigene Reservierungen
- * - Inhaber und Team: Anfragen, Mitglieder, Abgabe-Doku und Club-Verwaltung
+ * - Mitglied: Reservieren und eigene Reservierungen, Ankündigungen und Hinweise vom Club
+ * - Moderator: wie Mitglied, dazu der Reiter Moderation (Meldungen, Verwarnen, Sperren, Ankündigungen)
+ * - Inhaber und Team: Anfragen, Mitglieder, Abgabe-Doku, Moderation und Club-Verwaltung
  *
  * @param onUpgradeClick öffnet euren Kaufbildschirm für Social Club Farmer
  */
@@ -78,7 +83,9 @@ fun ClubScreen(
     dispensing: Boolean = true,
     /** Gesehene Club-Einführungen je Rolle; null = keine automatische Einführung. */
     onboarding: de.greenganja.growguardian.ui.wizard.OnboardingPrefs? = null,
-    viewModel: ClubViewModel = viewModel { ClubViewModel(clubs, subscriptions, clubBoxes, ownBoxes, boxPrefs, dispensing) },
+    /** Moderations-Werkzeuge, Ankündigungen und Hinweise; null = ausgeblendet. */
+    moderation: ModerationRepository? = null,
+    viewModel: ClubViewModel = viewModel { ClubViewModel(clubs, subscriptions, clubBoxes, ownBoxes, boxPrefs, dispensing, moderation) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -122,6 +129,8 @@ fun ClubScreen(
         }
     }
 
+    val onMessage: (String) -> Unit = { text -> scope.launch { snackbar.showSnackbar(text) } }
+
     LaunchedEffect(viewModel) {
         viewModel.eventFlow.collect { event ->
             when (event) {
@@ -160,8 +169,8 @@ fun ClubScreen(
                 when {
                     state.loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     showMarket && market != null && membership != null && !membership.isPending -> {
-                        val marketViewModel: MarketViewModel = viewModel(key = "market-${membership.clubId}-${membership.isStaff}") {
-                            MarketViewModel(membership.clubId, membership.isStaff, market, propagation = dispensing)
+                        val marketViewModel: MarketViewModel = viewModel(key = "market-${membership.clubId}-${membership.role.id}") {
+                            MarketViewModel(membership.clubId, membership.isStaff, market, propagation = dispensing, canModerate = membership.canModerate)
                         }
                         MarketScreen(
                             viewModel = marketViewModel,
@@ -171,12 +180,41 @@ fun ClubScreen(
                     }
                     membership == null -> NoClubContent(state, viewModel, onUpgradeClick)
                     membership.isPending -> PendingContent(membership, viewModel)
-                    membership.isStaff -> StaffContent(state, viewModel, onUpgradeClick, onOpenMarket = market?.let { { showMarket = true } })
+                    membership.isStaff -> StaffContent(
+                        state, viewModel, onUpgradeClick,
+                        onOpenMarket = market?.let { { showMarket = true } },
+                        moderation = moderation?.let { repository -> @Composable { ModerationArea(membership.clubId, repository, onMessage) } },
+                    )
+                    membership.isModerator && moderation != null -> ModeratorContent(
+                        moderation = { ModerationArea(membership.clubId, moderation, onMessage) },
+                        member = { MemberContent(state, membership, viewModel, onOpenMarket = market?.let { { showMarket = true } }) },
+                    )
                     else -> MemberContent(state, membership, viewModel, onOpenMarket = market?.let { { showMarket = true } })
                 }
             }
         }
         invite?.let { InviteDialog(invite = it, onDismiss = { invite = null }) }
+    }
+}
+
+/** Moderations-Reiter mit eigenem ViewModel je Club. */
+@Composable
+private fun ModerationArea(clubId: String, repository: ModerationRepository, onMessage: (String) -> Unit) {
+    val moderationViewModel: ModerationViewModel = viewModel(key = "moderation-$clubId") { ModerationViewModel(repository) }
+    ModerationTab(moderationViewModel, onMessage)
+}
+
+/** Moderatoren: Mitglieder-Ansicht und Moderation in zwei Reitern. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModeratorContent(moderation: @Composable () -> Unit, member: @Composable () -> Unit) {
+    var tab by rememberSaveable { mutableStateOf(0) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        PrimaryScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
+            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Mitglied") })
+            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Moderation") })
+        }
+        if (tab == 1) moderation() else member()
     }
 }
 
@@ -298,10 +336,11 @@ private fun MemberContent(state: ClubUiState, membership: Membership, viewModel:
         item {
             Column {
                 Text(text = membership.clubName, style = MaterialTheme.typography.headlineSmall)
-                Hint("Mitglied")
+                Hint(membership.role.label)
             }
         }
         inlineAd("club-member-top")
+        clubNewsItems(state.announcements, state.notices, now)
         if (onOpenMarket != null) {
             item {
                 OutlinedButton(onClick = onOpenMarket, modifier = Modifier.fillMaxWidth()) {

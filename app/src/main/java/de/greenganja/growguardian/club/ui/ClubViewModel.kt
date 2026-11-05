@@ -15,8 +15,11 @@ import de.greenganja.growguardian.club.ClubMember
 import de.greenganja.growguardian.club.ClubRepository
 import de.greenganja.growguardian.club.ClubRole
 import de.greenganja.growguardian.club.Dispensation
+import de.greenganja.growguardian.club.Announcement
 import de.greenganja.growguardian.club.MemberStatus
 import de.greenganja.growguardian.club.Membership
+import de.greenganja.growguardian.club.ModNotice
+import de.greenganja.growguardian.club.ModerationRepository
 import de.greenganja.growguardian.club.Reservation
 import de.greenganja.growguardian.club.StaffInvite
 import de.greenganja.growguardian.grow.GrowBox
@@ -63,6 +66,12 @@ data class ClubUiState(
     val busy: Boolean = false,
     /** Reservierungen und Abgabe-Doku in dieser App-Fassung (nicht in der Play-Store-Fassung). */
     val dispensing: Boolean = true,
+    /** Ankündigungen von Team und Moderation, für alle aktiven Mitglieder. */
+    val announcements: List<Announcement> = emptyList(),
+    /** Einträge der Moderation über einen selbst (Verwarnung, Sperre, entferntes Inserat). */
+    val notices: List<ModNotice> = emptyList(),
+    /** Moderation ist eingebunden (Ernennen, Reiter Moderation). */
+    val moderationAvailable: Boolean = false,
 ) {
     /** Eigenes Social-Club-Abo, aber noch kein Club. */
     val canCreateClub: Boolean
@@ -70,7 +79,8 @@ data class ClubUiState(
 
     val pendingMembers: List<ClubMember> get() = members.filter { it.status == MemberStatus.PENDING }
     val activeMembers: List<ClubMember> get() = members.filter { it.status == MemberStatus.ACTIVE }
-    val team: List<ClubMember> get() = members.filter { it.role != ClubRole.MEMBER }
+    val team: List<ClubMember> get() = members.filter { it.role == ClubRole.OWNER || it.role == ClubRole.STAFF }
+    val moderators: List<ClubMember> get() = members.filter { it.role == ClubRole.MODERATOR }
     val dispensedGramsInMonth: Double get() = dispensations.sumOf { it.grams }
 
     fun member(uid: String): ClubMember? = members.firstOrNull { it.uid == uid }
@@ -104,6 +114,8 @@ private data class ClubData(
     val myReservations: List<Reservation> = emptyList(),
     val clubBoxes: List<ClubBox> = emptyList(),
     val settings: MemberSettings = MemberSettings(),
+    val announcements: List<Announcement> = emptyList(),
+    val notices: List<ModNotice> = emptyList(),
 )
 
 private data class BoxOrder(val pinned: Set<String>, val hidden: Set<String>, val showHidden: Boolean)
@@ -116,6 +128,7 @@ class ClubViewModel(
     private val ownBoxSource: (suspend () -> List<GrowBox>)? = null,
     private val boxPrefs: ClubBoxPrefs? = null,
     private val dispensing: Boolean = true,
+    private val moderation: ModerationRepository? = null,
 ) : ViewModel() {
 
     private val month = MutableStateFlow(ClubFormat.currentMonth())
@@ -138,7 +151,21 @@ class ClubViewModel(
         } else {
             flowOf(MemberSettings())
         }
-        combine(dataFor(membership), boxes, settings) { data, shared, mine -> data.copy(clubBoxes = shared, settings = mine) }
+        val activeClub = membership?.takeIf { !it.isPending }?.clubId
+        val mod = moderation
+        val announcements = if (activeClub != null && mod != null) {
+            mod.announcements(activeClub).catch { emit(emptyList()) }
+        } else {
+            flowOf(emptyList())
+        }
+        val notices = if (activeClub != null && mod != null) {
+            mod.myNotices(activeClub, clubs.currentUid).catch { emit(emptyList()) }
+        } else {
+            flowOf(emptyList())
+        }
+        combine(dataFor(membership), boxes, settings, announcements, notices) { data, shared, mine, news, notes ->
+            data.copy(clubBoxes = shared, settings = mine, announcements = news, notices = notes)
+        }
     }
 
     private fun dataFor(membership: Membership?): Flow<ClubData> {
@@ -179,6 +206,9 @@ class ClubViewModel(
                 showHiddenBoxes = order.showHidden,
                 dispensing = dispensing,
                 busy = busy,
+                announcements = data.announcements,
+                notices = data.notices,
+                moderationAvailable = moderation != null,
             )
         }
             .catch {
@@ -216,6 +246,14 @@ class ClubViewModel(
     fun removeMember(uid: String) {
         val wasPending = state.value.member(uid)?.status == MemberStatus.PENDING
         act({ clubs.removeMember(uid) }) { if (wasPending) "Antrag abgelehnt." else "Mitglied entfernt." }
+    }
+
+    /** Moderator ernennen oder abberufen (Team und Inhaber). */
+    fun setModerator(uid: String, moderator: Boolean) {
+        val repository = moderation ?: return
+        act({ repository.setModerator(uid, moderator) }) {
+            if (moderator) "Zum Moderator ernannt. Die Person sieht jetzt den Reiter „Moderation“." else "Als Moderator abberufen."
+        }
     }
 
     fun rotateMemberCode() = act({ clubs.rotateMemberCode() }) { "Neuer Mitglieder-Code erstellt, der alte gilt nicht mehr." }

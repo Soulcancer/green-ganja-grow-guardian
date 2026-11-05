@@ -10,6 +10,7 @@ import de.greenganja.growguardian.billing.SubscriptionManager
 import de.greenganja.growguardian.club.ClubBoxRepository
 import de.greenganja.growguardian.club.ClubRepository
 import de.greenganja.growguardian.club.MarketRepository
+import de.greenganja.growguardian.club.ModerationRepository
 import de.greenganja.growguardian.grow.GrowBoxRepository
 import de.greenganja.growguardian.grow.automation.AutomationRepository
 import de.greenganja.growguardian.grow.automation.GrowAutomations
@@ -47,6 +48,7 @@ class GrowGuardianApp : Application(), GrowMonitorHost {
     val growAutomations by lazy { GrowAutomations(this, AutomationRepository(), ServerAutomationEngine()) }
     val clubBoxes by lazy { ClubBoxRepository() }
     val market by lazy { MarketRepository() }
+    val moderation by lazy { ModerationRepository() }
     val wallets by lazy { WalletRepository() }
     val ads by lazy {
         AdsManager(

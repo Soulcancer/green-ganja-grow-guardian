@@ -116,6 +116,7 @@ fun AppNavigation(app: GrowGuardianApp) {
                 market = app.market,
                 dispensing = Distribution.dispensing,
                 onboarding = onboarding,
+                moderation = app.moderation,
             )
             AppTab.COINS -> RewardsScreen(app.wallets, app.subscriptions, app.ads, modifier = modifier)
             AppTab.ACCOUNT -> AccountScreen(

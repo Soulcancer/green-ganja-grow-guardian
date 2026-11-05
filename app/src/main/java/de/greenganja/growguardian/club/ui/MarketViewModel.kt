@@ -49,6 +49,8 @@ data class MarketUiState(
     val loading: Boolean = true,
     val myUid: String? = null,
     val isStaff: Boolean = false,
+    /** Moderatoren und Team: Meldungen sehen, Zubehör entfernen. */
+    val canModerate: Boolean = false,
     val propagation: Boolean = true,
     val listings: List<Listing> = emptyList(),
     val filter: MarketFilter = MarketFilter.ALL,
@@ -94,6 +96,7 @@ class MarketViewModel(
     private val market: MarketRepository,
     /** Samen und Stecklinge als Club-Angebot; nicht in der Play-Store-Fassung. */
     private val propagation: Boolean = true,
+    private val canModerate: Boolean = isStaff,
 ) : ViewModel() {
 
     private val ui = MutableStateFlow(Ui(MarketFilter.ALL, null, false))
@@ -106,7 +109,7 @@ class MarketViewModel(
         market.listings(clubId).safe(),
         if (propagation) market.myPropagationRequests(clubId).safe() else flowOf(emptyList()),
         if (isStaff && propagation) market.openPropagationRequests(clubId).safe() else flowOf(emptyList()),
-        if (isStaff) market.reported(clubId).safe() else flowOf(emptyList()),
+        if (canModerate) market.reported(clubId).safe() else flowOf(emptyList()),
         ::MarketData,
     )
 
@@ -119,6 +122,7 @@ class MarketViewModel(
             loading = false,
             myUid = market.currentUid,
             isStaff = isStaff,
+            canModerate = canModerate,
             propagation = propagation,
             listings = if (propagation) d.listings else d.listings.filter { it !is Listing.Propagation },
             filter = u.filter,
@@ -129,7 +133,7 @@ class MarketViewModel(
             selectedId = u.selectedId,
             busy = u.busy,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MarketUiState(isStaff = isStaff))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MarketUiState(isStaff = isStaff, canModerate = canModerate))
 
     fun setFilter(filter: MarketFilter) {
         ui.value = ui.value.copy(filter = filter)
@@ -147,6 +151,9 @@ class MarketViewModel(
 
     fun setStatus(listing: Listing, status: ListingStatus) =
         act({ market.setStatus(listing.id, status) }, if (status == ListingStatus.REMOVED) "Inserat entfernt." else "Status: ${status.label}.")
+
+    /** Gemeldetes Inserat wieder freigeben; setzt die Meldungen zurück. */
+    fun restore(listing: Listing) = act({ market.restore(listing.id) }, "Inserat ist wieder sichtbar.")
 
     fun expressInterest(listing: Listing, message: String?) =
         act({ market.expressInterest(listing.id, message) }, "Interesse gemeldet. ${listing.sellerName} sieht deinen Namen und deine Nachricht.")

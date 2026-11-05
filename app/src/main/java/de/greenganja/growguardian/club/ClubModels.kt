@@ -9,6 +9,9 @@ enum class ClubRole(val id: String) {
     /** Belegt einen der 5 Team-Plätze (Social Club Farmer). */
     STAFF("staff"),
 
+    /** Aktives Mitglied mit Moderations-Werkzeugen (Meldungen, Verwarnungen, Ankündigungen), ohne Team-Platz. */
+    MODERATOR("moderator"),
+
     /** Normales Club-Mitglied, kann Abgabemengen reservieren. */
     MEMBER("member"),
     ;
@@ -51,8 +54,13 @@ data class Membership(
     val role: ClubRole,
     val status: MemberStatus,
 ) {
-    val isStaff: Boolean get() = role != ClubRole.MEMBER
+    /** Inhaber oder Team-Platz: volle Club-Verwaltung. */
+    val isStaff: Boolean get() = role == ClubRole.OWNER || role == ClubRole.STAFF
     val isOwner: Boolean get() = role == ClubRole.OWNER
+    val isModerator: Boolean get() = role == ClubRole.MODERATOR
+
+    /** Moderations-Werkzeuge: Moderatoren und Team. */
+    val canModerate: Boolean get() = !isPending && (isStaff || isModerator)
     val isPending: Boolean get() = status == MemberStatus.PENDING
 }
 

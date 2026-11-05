@@ -23,7 +23,7 @@ Werkzeug für legalen Eigenanbau ohne Verkauf.
 2. Authentication → Anmeldemethode **E-Mail/Passwort** aktivieren. Cloud Messaging ist automatisch aktiv (für Push-Alarme). Unter *Vorlagen* die Mails (Passwort zurücksetzen) auf Deutsch stellen.
 3. Android-App hinzufügen: Paket `de.greenganja.growguardian` (und für Debug `de.greenganja.growguardian.debug`), SHA-256 des Upload- und des Play-App-Signing-Schlüssels eintragen. `google-services.json` nach `app/` legen.
 4. Backend: `backend/functions/.env` aus `.env.example`, Secrets setzen (README Abschnitt 8), dann `backend/deploy.sh <projekt-id>`.
-5. Firestore → TTL-Richtlinien: `expireAt` für `dispensations`, `reservations`, `history`, `stats`, `listings`, `propagationRequests`, `propagationLog`, `ledger`, `adRewards`.
+5. Firestore → TTL-Richtlinien: `expireAt` für `dispensations`, `reservations`, `history`, `stats`, `listings`, `propagationRequests`, `propagationLog`, `ledger`, `adRewards`, `modLog`, `announcements`.
 6. Empfohlen vor dem Start: **App Check** mit Play Integrity aktivieren und in den Functions `enforceAppCheck: true` setzen.
 
 ## 2. RevenueCat und Google-Play-Abos

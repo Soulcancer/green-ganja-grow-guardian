@@ -20,6 +20,7 @@ import {
   type MaterialCount,
 } from "./rules/market";
 import { visibleName } from "./rules/member";
+import { blockMessage, isBlocked, mayRemoveListing, MOD_LOG_RETENTION_DAYS, roleIn } from "./rules/moderation";
 
 const now = () => FieldValue.serverTimestamp();
 const expiry = () => Timestamp.fromDate(new Date(Date.now() + LISTING_VALID_DAYS * 24 * 60 * 60 * 1000));
@@ -33,6 +34,14 @@ async function requireActiveMember(uid: string): Promise<ClubContext & { member:
   return { ...context, member };
 }
 
+/** Von der Moderation im Marktplatz gesperrt: keine neuen Inserate und Anfragen. */
+function requireNotBlocked(member: MemberDoc): void {
+  const until = member.marketBlockedUntil?.toMillis();
+  if (until !== undefined && isBlocked(until, Date.now())) {
+    fail("permission-denied", "market-blocked", blockMessage(until, member.marketBlockReason));
+  }
+}
+
 function nameOf(member: MemberDoc & { publicName?: string | null }): string {
   return visibleName(member.publicName, member.firstName, member.lastName, member.displayName);
 }
@@ -43,6 +52,7 @@ export const createListing = onCall(callOptions, async (request) => {
   const input = parseGear(request.data);
   if (typeof input === "string") fail("invalid-argument", "invalid-input", input);
   const { clubRef, member } = await requireActiveMember(uid);
+  requireNotBlocked(member);
 
   const open = await clubRef.collection("listings").where("sellerUid", "==", uid).where("status", "in", ["open", "reserved"]).get();
   if (open.size >= MAX_OPEN_LISTINGS_PER_MEMBER) {
@@ -83,20 +93,49 @@ export const createPropagationOffer = onCall(callOptions, async (request) => {
   return { listingId: ref.id };
 });
 
-/** Status ändern: offen, reserviert, erledigt (Anbieter oder Team) oder entfernt (nur Team). */
+/** Status ändern: offen, reserviert, erledigt (Anbieter oder Team) oder entfernt (Team; Moderatoren nur Zubehör). */
 export const setListingStatus = onCall(callOptions, async (request) => {
   const uid = requireUid(request);
   const id = request.data?.listingId;
   const status = request.data?.status;
   if (!isId(id) || typeof status !== "string") fail("invalid-argument", "invalid-input", "Ungültiges Inserat.");
-  const { clubRef, club } = await requireMember(uid);
+  const { clubRef, club, membership } = await requireMember(uid);
   const ref = clubRef.collection("listings").doc(id);
   const snap = await ref.get();
   if (!snap.exists) fail("not-found", "not-found", "Dieses Inserat gibt es nicht mehr.");
-  if (!mayChangeListing(uid, snap.get("sellerUid") as string, club.staffUids.includes(uid), status)) {
+  const role = roleIn(uid, club.ownerUid, club.staffUids, club.moderatorUids);
+  const sellerUid = snap.get("sellerUid") as string;
+  const kind = snap.get("kind") as string;
+  const moderatorRemoves = status === "removed" && membership.status === "active" && mayRemoveListing(role, kind);
+  if (!mayChangeListing(uid, sellerUid, club.staffUids.includes(uid), status) && !moderatorRemoves) {
     fail("permission-denied", "not-staff", "Das darfst du bei diesem Inserat nicht.");
   }
-  await ref.update({ status, updatedAt: now(), ...(status === "open" ? { expireAt: expiry() } : {}) });
+  const removedByOther = status === "removed" && uid !== sellerUid;
+  const actor = removedByOther ? ((await clubRef.collection("members").doc(uid).get()).data() as MemberDoc | undefined) : undefined;
+  const batch = db().batch();
+  batch.update(ref, {
+    status,
+    updatedAt: now(),
+    ...(status === "open" ? { expireAt: expiry() } : {}),
+    ...(status === "removed" ? { removedBy: uid } : {}),
+  });
+  // Entfernen durch Team oder Moderation steht im Protokoll; die anbietende Person sieht den Eintrag
+  if (removedByOther) {
+    batch.create(clubRef.collection("modLog").doc(), {
+      action: "remove",
+      byUid: uid,
+      byName: actor ? nameOf(actor) : "Club-Team",
+      targetUid: kind === "gear" ? sellerUid : null,
+      targetName: kind === "gear" ? (snap.get("sellerName") as string) : null,
+      listingId: id,
+      listingTitle: (kind === "gear" ? snap.get("title") : snap.get("strain")) as string,
+      reason: null,
+      until: null,
+      createdAt: now(),
+      expireAt: Timestamp.fromDate(new Date(Date.now() + MOD_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000)),
+    });
+  }
+  await batch.commit();
   return { ok: true };
 });
 
@@ -107,6 +146,7 @@ export const expressInterest = onCall(callOptions, async (request) => {
   const message = optionalText(request.data?.message, 300);
   if (!isId(id) || message === null) fail("invalid-argument", "invalid-input", "Die Nachricht darf höchstens 300 Zeichen haben.");
   const { clubRef, member } = await requireActiveMember(uid);
+  requireNotBlocked(member);
   const listing = await clubRef.collection("listings").doc(id).get();
   if (!listing.exists || listing.get("status") !== "open" || listing.get("kind") !== "gear") {
     fail("failed-precondition", "wrong-status", "Dieses Inserat ist nicht mehr offen.");

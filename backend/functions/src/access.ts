@@ -43,7 +43,7 @@ export async function requireMember(uid: string): Promise<ClubContext> {
 
 export async function requireStaff(uid: string): Promise<ClubContext> {
   const context = await requireMember(uid);
-  if (context.membership.role === "member" || !context.club.staffUids.includes(uid)) {
+  if ((context.membership.role !== "owner" && context.membership.role !== "staff") || !context.club.staffUids.includes(uid)) {
     fail("permission-denied", "not-staff", "Das darf nur das Club-Team.");
   }
   return context;

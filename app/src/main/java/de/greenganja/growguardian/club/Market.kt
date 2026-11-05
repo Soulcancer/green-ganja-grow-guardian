@@ -230,6 +230,10 @@ class MarketRepository(
     suspend fun expressInterest(listingId: String, message: String?): Result<Unit> =
         backend.call("expressInterest", mapOf("listingId" to listingId, "message" to message)).map { }
 
+    /** Gemeldetes Inserat wieder freigeben (Meldungen werden gelöscht). Moderatoren und Team. */
+    suspend fun restore(listingId: String): Result<Unit> =
+        backend.call("decideReport", mapOf("listingId" to listingId, "decision" to "restore")).map { }
+
     suspend fun report(listingId: String, reason: String?): Result<Unit> =
         backend.call("reportListing", mapOf("listingId" to listingId, "reason" to reason)).map { }
 

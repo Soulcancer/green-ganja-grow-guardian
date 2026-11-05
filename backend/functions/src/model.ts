@@ -5,7 +5,7 @@ import type { Timestamp } from "firebase-admin/firestore";
  *
  * memberships/{uid}                    Zu welchem Club ein Nutzer gehört (liest nur der Nutzer selbst)
  * clubs/{clubId}                       Club, clubId = UID des Käufers (liest nur das Club-Team)
- * clubs/{clubId}/members/{uid}         Mitglieder inkl. Team (liest das Team und das Mitglied selbst)
+ * clubs/{clubId}/members/{uid}         Mitglieder inkl. Team und Moderatoren (liest das Team und das Mitglied selbst)
  * clubs/{clubId}/reservations/{id}     Reservierungen (liest das Team und wer reserviert hat)
  * clubs/{clubId}/dispensations/{id}    Abgabe-Dokumentation nach § 26 KCanG (liest nur das Team)
  * invites/{code}                       Einladungen für Team-Plätze (nur Functions)
@@ -21,6 +21,8 @@ import type { Timestamp } from "firebase-admin/firestore";
  * …/listings/{id}/reports/{uid}        Meldungen (nur Functions und Team)
  * clubs/{clubId}/propagationRequests/{id}  Anfragen nach Samen/Stecklingen (liest das Team und wer angefragt hat)
  * clubs/{clubId}/propagationLog/{id}   Ausgabe von Vermehrungsmaterial, 5 Jahre (§ 26 KCanG, nur Team)
+ * clubs/{clubId}/announcements/{id}   Ankündigungen von Team und Moderatoren, 30 Tage (liest jedes aktive Mitglied)
+ * clubs/{clubId}/modLog/{id}          Moderations-Protokoll, 1 Jahr (liest Team, Moderatoren und die betroffene Person)
  * wallets/{uid}                       Coins: Guthaben, Serie, werbefrei/Alarme bis, Erfolge (liest der Nutzer, nur Functions schreiben)
  * wallets/{uid}/ledger/{id}           Coin-Buchungen, 1 Jahr
  * adRewards/{transactionId}           Gutgeschriebene Belohnungsvideos (nur Functions)
@@ -30,7 +32,8 @@ import type { Timestamp } from "firebase-admin/firestore";
  * tuyaAccounts/{uid}                   Zugangsdaten für den Tuya-UID-Login (nur Functions)
  */
 
-export type Role = "owner" | "staff" | "member";
+/** moderator: aktives Mitglied mit Moderations-Werkzeugen, ohne Team-Platz und ohne Personendaten. */
+export type Role = "owner" | "staff" | "moderator" | "member";
 export type MemberStatus = "pending" | "active";
 export type ReservationStatus = "requested" | "confirmed" | "declined" | "handedOut" | "cancelled";
 
@@ -57,6 +60,8 @@ export interface ClubDoc {
   memberCode: string;
   /** Bis wann jeder Team-Platz in RevenueCat freigegeben ist (ms). */
   staffGrants?: Record<string, number>;
+  /** Moderatoren (höchstens MAX_MODERATORS), zählen nicht zu den Team-Plätzen. */
+  moderatorUids?: string[];
 }
 
 export interface MemberDoc {
@@ -68,6 +73,27 @@ export interface MemberDoc {
   lastName?: string;
   /** "YYYY-MM-DD", vom Team nach Ausweiskontrolle eingetragen. */
   birthDate?: string;
+  /** Anzahl der Verwarnungen durch Moderation. */
+  warnings?: number;
+  /** Bis dahin keine neuen Inserate und Anfragen im Marktplatz. */
+  marketBlockedUntil?: Timestamp | null;
+  marketBlockReason?: string | null;
+}
+
+export interface ModLogDoc {
+  action: string;
+  byUid: string;
+  byName: string;
+  /** Betroffene Person; sie kann den Eintrag lesen. */
+  targetUid: string | null;
+  targetName: string | null;
+  listingId: string | null;
+  listingTitle: string | null;
+  reason: string | null;
+  /** Ende einer Sperre. */
+  until: Timestamp | null;
+  createdAt: unknown;
+  expireAt: Timestamp;
 }
 
 export interface ReservationDoc {

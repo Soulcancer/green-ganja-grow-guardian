@@ -113,7 +113,7 @@ private fun Header(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun Pill(text: String, selected: Boolean, onClick: () -> Unit) {
+internal fun Pill(text: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
@@ -181,7 +181,7 @@ private fun MarketList(
                 }
                 item { Hint("„Ausgegeben“ erst nach Ausweiskontrolle vor Ort. Die Ausgabe wird 5 Jahre dokumentiert.") }
             }
-            if (state.isStaff && state.reported.isNotEmpty()) {
+            if (state.canModerate && state.reported.isNotEmpty()) {
                 item { SectionTitle("Gemeldet (${state.reported.size})") }
                 items(state.reported, key = { "rep-${it.id}" }) { listing ->
                     ListingCard(listing, onClick = { viewModel.open(listing.id) })
@@ -359,11 +359,12 @@ private fun ListingDetail(listing: Listing, state: MarketUiState, viewModel: Mar
             if (!mine) {
                 item { TextButton(onClick = { reportOpen = true }, enabled = !state.busy) { Text("Inserat melden") } }
             }
-            if (state.isStaff && listing.status != ListingStatus.REMOVED) {
+            // Team: alles; Moderatoren: Zubehör (Club-Angebote entscheidet das Team)
+            if ((state.isStaff || (state.canModerate && listing is Listing.Gear)) && listing.status != ListingStatus.REMOVED) {
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (listing.status == ListingStatus.REPORTED) {
-                            OutlinedButton(onClick = { viewModel.setStatus(listing, ListingStatus.OPEN) }, enabled = !state.busy) { Text("Wieder freigeben") }
+                            OutlinedButton(onClick = { viewModel.restore(listing) }, enabled = !state.busy) { Text("Wieder freigeben") }
                         }
                         TextButton(onClick = { viewModel.setStatus(listing, ListingStatus.REMOVED) }, enabled = !state.busy) {
                             Text("Entfernen", color = MaterialTheme.colorScheme.error)

@@ -51,6 +51,7 @@ export const createClub = onCall(storeCallOptions, async (request) => {
       expiresAt: Timestamp.fromMillis(until),
       memberCode,
       staffGrants: {},
+      moderatorUids: [],
       createdAt: now(),
       updatedAt: now(),
     });
@@ -126,14 +127,15 @@ async function joinAsStaff(uid: string, displayName: string, inviteRef: Document
     requireActiveClub(club);
 
     const existing = membershipSnap.data() as MembershipDoc | undefined;
-    if (existing && (existing.clubId !== clubRef.id || existing.role !== "member")) {
+    // Mitglieder und Moderatoren desselben Clubs dürfen einen Team-Platz annehmen
+    if (existing && (existing.clubId !== clubRef.id || (existing.role !== "member" && existing.role !== "moderator"))) {
       fail("failed-precondition", "already-in-club", "Du bist bereits in einem Club-Team.");
     }
     if (club.staffUids.length >= club.seats) {
       fail("resource-exhausted", "club-full", `Alle ${club.seats} Plätze sind belegt.`);
     }
 
-    tx.update(clubRef, { staffUids: FieldValue.arrayUnion(uid), updatedAt: now() });
+    tx.update(clubRef, { staffUids: FieldValue.arrayUnion(uid), moderatorUids: FieldValue.arrayRemove(uid), updatedAt: now() });
     tx.set(membershipRef, { clubId: clubRef.id, clubName: club.name, role: "staff", status: "active", updatedAt: now() });
     if (memberSnap.exists) {
       tx.update(memberRef, { role: "staff", status: "active" });
@@ -141,14 +143,14 @@ async function joinAsStaff(uid: string, displayName: string, inviteRef: Document
       tx.create(memberRef, { uid, role: "staff", status: "active", displayName, joinedAt: now() });
     }
     tx.delete(inviteRef);
-    return { clubRef, club, invite, previousStatus: existing?.status };
+    return { clubRef, club, invite, previousStatus: existing?.status, previousRole: existing?.role };
   });
 
   if (joined.club.expiresAt) {
     try {
       await grantSeat(joined.clubRef, uid, joined.club.expiresAt.toMillis());
     } catch {
-      await undoStaffJoin(uid, joined.clubRef, inviteRef, joined.invite, joined.previousStatus);
+      await undoStaffJoin(uid, joined.clubRef, inviteRef, joined.invite, joined.previousStatus, joined.previousRole);
       fail("unavailable", "store-unavailable", "Der Team-Platz konnte gerade nicht freigeschaltet werden. Bitte versuche es gleich noch einmal.");
     }
   }
@@ -162,15 +164,18 @@ async function undoStaffJoin(
   inviteRef: DocumentReference,
   invite: InviteDoc,
   previousStatus: MembershipDoc["status"] | undefined,
+  previousRole: MembershipDoc["role"] | undefined,
 ): Promise<void> {
   const membershipRef = db().doc(`memberships/${uid}`);
   const memberRef = clubRef.collection("members").doc(uid);
   await db().runTransaction(async (tx) => {
     tx.update(clubRef, { staffUids: FieldValue.arrayRemove(uid), updatedAt: now() });
     if (previousStatus) {
-      // War vorher normales Mitglied: alten Stand wiederherstellen
-      tx.update(membershipRef, { role: "member", status: previousStatus, updatedAt: now() });
-      tx.update(memberRef, { role: "member", status: previousStatus });
+      // War vorher Mitglied oder Moderator: alten Stand wiederherstellen
+      const role = previousRole === "moderator" ? "moderator" : "member";
+      if (role === "moderator") tx.update(clubRef, { moderatorUids: FieldValue.arrayUnion(uid) });
+      tx.update(membershipRef, { role, status: previousStatus, updatedAt: now() });
+      tx.update(memberRef, { role, status: previousStatus });
     } else {
       tx.delete(membershipRef);
       tx.delete(memberRef);
@@ -274,7 +279,7 @@ export const approveMember = onCall(callOptions, async (request) => {
   return {};
 });
 
-/** Mitglied entfernen (kein Team-Mitglied, dafür removeStaff). Nur für das Team. */
+/** Mitglied oder Moderator entfernen (kein Team-Mitglied, dafür removeStaff). Nur für das Team. */
 export const removeMember = onCall(callOptions, async (request) => {
   const { clubRef } = await requireStaff(requireUid(request));
   const target = request.data?.uid;
@@ -283,7 +288,7 @@ export const removeMember = onCall(callOptions, async (request) => {
   const memberSnap = await clubRef.collection("members").doc(target).get();
   const member = memberSnap.data() as MemberDoc | undefined;
   if (!member) fail("not-found", "not-found", "Diese Person ist kein Mitglied.");
-  if (member.role !== "member") {
+  if (member.role !== "member" && member.role !== "moderator") {
     fail("failed-precondition", "not-owner", "Team-Mitglieder entfernt der Inhaber über die Team-Verwaltung.");
   }
   await removeFromClub(clubRef, target);
@@ -303,7 +308,7 @@ export const rotateMemberCode = onCall(callOptions, async (request) => {
 export async function removeFromClub(clubRef: DocumentReference, uid: string): Promise<void> {
   await db().runTransaction(async (tx) => {
     const openReservations = await openReservationRefs(tx, clubRef, uid);
-    tx.update(clubRef, { staffUids: FieldValue.arrayRemove(uid), updatedAt: now() });
+    tx.update(clubRef, { staffUids: FieldValue.arrayRemove(uid), moderatorUids: FieldValue.arrayRemove(uid), updatedAt: now() });
     tx.delete(db().doc(`memberships/${uid}`));
     tx.delete(clubRef.collection("members").doc(uid));
     for (const ref of openReservations) {

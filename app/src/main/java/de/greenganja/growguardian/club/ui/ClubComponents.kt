@@ -47,6 +47,7 @@ internal val ClubRole.label: String
     get() = when (this) {
         ClubRole.OWNER -> "Inhaber"
         ClubRole.STAFF -> "Team"
+        ClubRole.MODERATOR -> "Moderator"
         ClubRole.MEMBER -> "Mitglied"
     }
 

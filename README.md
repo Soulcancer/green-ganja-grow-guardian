@@ -48,14 +48,14 @@ Ein Social Club hat außerdem **Mitglieder**: beliebig viele, kostenlos. Sie bea
 | `app/…/tuya/` | Tuya-Anmeldung über das Firebase-Konto, Live-Werte aller Geräte, Geräte koppeln |
 | `app/…/ui/theme/` | `GrowGuardianTheme`: das dunkelgrüne App-Design für alle Bildschirme |
 | `app/…/billing/` | RevenueCat: drei Stufen, Kauf, Upgrade, Restore, Feature-Limits |
-| `app/…/club/` | Club-Verwaltung: Team-Plätze, Mitglieder, Reservierungen, Abgabe-Doku |
+| `app/…/club/` | Club-Verwaltung: Team-Plätze, Mitglieder, Moderation, Reservierungen, Abgabe-Doku |
 | `app/…/club/ui/` | Bildschirme in Jetpack Compose: `ClubScreen` als Einstieg, ViewModel, Dialoge, Club-Boxen, Mein Bereich, Marktplatz |
 | `app/…/backend/Backend.kt` | Aufruf der Cloud Functions mit deutschen Fehlermeldungen |
 | `app/…/account/TuyaAccountLink.kt` | Tuya-Login über das Firebase-Konto |
 | `backend/functions/` | Cloud Functions (TypeScript) inkl. Tests |
 | `backend/firestore.rules`, `firestore.indexes.json` | Leserechte, Indizes, automatische Löschfristen |
 
-**Geprüft:** Der Kotlin-Code ist gegen die API von RevenueCat 11.0.0 (aus dem Quellcode), die Compose-, Material-3-, Activity- und Lifecycle-Signaturen aus dem aktuellen AndroidX-Quellcode, WorkManager- und NotificationCompat-Signaturen aus dem AndroidX-Quellcode, die Tuya-Schnittstellen aus Tuyas offiziellem Beispielprojekt und nachgebildete Firebase-Schnittstellen kompiliert, 103 Unit-Tests laufen grün (u. a. VPD, Datenpunkt-Umrechnung, Limits, Kopplungs-Berechtigungen, Alarm-Regeln und Push-Szenen, Verlauf, Automationen, Club-Boxen, Marktplatz, Werbe-Regeln, Coins, Anmeldung). Das Backend ist mit TypeScript 6 und 7 gegen die Signaturen von firebase-functions 7.4.0 und firebase-admin 14.5.0 typgeprüft, 74 Tests (Server-Überwachung, KCanG-Grenzen, Codes, Webhook-Signatur, Grow-Box-Limits, Aufbewahrung des Verlaufs, Automationen, Club-Boxen, Mitglieder-Einstellungen, Marktplatz, Coins inkl. AdMob-Signaturprüfung) laufen grün. **Noch offen:** ein Gradle-Build mit echten Bibliotheken (hier nicht möglich, weil die Android-Repositories nicht erreichbar sind), ein Test mit echten Tuya-Geräten und gegen den Firebase-Emulator. Die Icon-Namen stammen aus `material-icons-extended` 1.7.8 und sind nicht gegen dessen Quellcode geprüft.
+**Geprüft:** Der Kotlin-Code ist gegen die API von RevenueCat 11.0.0 (aus dem Quellcode), die Compose-, Material-3-, Activity- und Lifecycle-Signaturen aus dem aktuellen AndroidX-Quellcode, WorkManager- und NotificationCompat-Signaturen aus dem AndroidX-Quellcode, die Tuya-Schnittstellen aus Tuyas offiziellem Beispielprojekt und nachgebildete Firebase-Schnittstellen kompiliert, 136 Unit-Tests laufen grün (u. a. VPD, Datenpunkt-Umrechnung, Limits, Kopplungs-Berechtigungen, Alarm-Regeln und Push-Szenen, Verlauf, Automationen, Club-Boxen, Marktplatz, Werbe-Regeln, Coins, Anmeldung). Das Backend ist mit TypeScript 6 und 7 gegen die Signaturen von firebase-functions 7.4.0 und firebase-admin 14.5.0 typgeprüft, 93 Tests (Server-Überwachung, KCanG-Grenzen, Codes, Webhook-Signatur, Grow-Box-Limits, Aufbewahrung des Verlaufs, Automationen, Club-Boxen, Mitglieder-Einstellungen, Marktplatz, Moderation, Coins inkl. AdMob-Signaturprüfung) laufen grün. **Noch offen:** ein Gradle-Build mit echten Bibliotheken (hier nicht möglich, weil die Android-Repositories nicht erreichbar sind), ein Test mit echten Tuya-Geräten und gegen den Firebase-Emulator. Die Icon-Namen stammen aus `material-icons-extended` 1.7.8 und sind nicht gegen dessen Quellcode geprüft.
 
 ## 1. Anmeldung: Firebase, RevenueCat und Tuya koppeln
 
@@ -419,10 +419,24 @@ composable("club") {
 |---|---|
 | Ohne Club | Code einlösen (Mitglieder-Code oder Team-Einladung); mit Social-Club-Abo zusätzlich „Club gründen“, sonst Hinweis aufs Upgrade |
 | Antrag offen | Hinweis auf die Freigabe nach Ausweiskontrolle, Antrag zurückziehen |
-| Mitglied | Marktplatz, Club-Boxen (anpinnen, ausblenden), Reservierungsformular mit Abholtag (heute bis 30 Tage), eigene Reservierungen mit Status, ändern (solange unbestätigt) und stornieren, **Mein Bereich** (Anzeigename, Benachrichtigungen, alle eigenen Daten als JSON herunterladen) |
-| Inhaber und Team | Reiter **Anfragen** (bestätigen, ablehnen, ausgeben, Ausgabe ohne Reservierung), **Mitglieder** (Code teilen oder erneuern, Anträge freigeben mit Ausweis-Häkchen, entfernen), **Doku** (Abgaben pro Monat, Jahres-CSV speichern), **Boxen** (eigene Box teilen, Teilen beenden), **Club** (Abo-Status, Team-Plätze vergeben und entziehen, eigene Reservierung); dazu der Marktplatz mit Anfragen nach Samen und Stecklingen und gemeldeten Inseraten |
+| Mitglied | **Hinweise vom Club** (eigene Verwarnungen, Sperren, entfernte Inserate mit Grund) und **Aktuelles vom Club** (Ankündigungen, angeheftete zuerst), Marktplatz, Club-Boxen (anpinnen, ausblenden), Reservierungsformular mit Abholtag (heute bis 30 Tage), eigene Reservierungen mit Status, ändern (solange unbestätigt) und stornieren, **Mein Bereich** (Anzeigename, Benachrichtigungen, alle eigenen Daten als JSON herunterladen) |
+| Moderator | wie Mitglied, dazu der Reiter **Moderation** (siehe unten); im Marktplatz gemeldete Inserate und „Entfernen“ bei Zubehör |
+| Inhaber und Team | Reiter **Anfragen** (bestätigen, ablehnen, ausgeben, Ausgabe ohne Reservierung), **Mitglieder** (Code teilen oder erneuern, Anträge freigeben mit Ausweis-Häkchen, entfernen, **Moderatoren ernennen und abberufen**), **Doku** (Abgaben pro Monat, Jahres-CSV speichern), **Boxen** (eigene Box teilen, Teilen beenden), **Moderation**, **Club** (Abo-Status, Team-Plätze vergeben und entziehen, eigene Reservierung); dazu der Marktplatz mit Anfragen nach Samen und Stecklingen und gemeldeten Inseraten |
 
 **Farben:** Mitglieder, Antragsteller und Nutzer ohne Club sehen den Club-Bereich in Rot-Lila (`ClubMemberPalette`: Himbeer-Rot auf dunklem Aubergine), das Team im App-Grün. Umgeschaltet wird in `ClubAreaTheme`.
+
+### Moderation
+
+Inhaber und Team ernennen aktive Mitglieder zu **Moderatoren** (`setModerator`, höchstens 10 je Club). Moderatoren belegen keinen der 5 Team-Plätze, brauchen kein Abo und sehen keine Personendaten: weder vollen Namen noch Geburtsdatum, keine Reservierungen und keine Abgabe-Doku. Freigaben nach Ausweiskontrolle bleiben beim Team.
+
+| Werkzeug | Function | Regeln |
+|---|---|---|
+| Meldungen | `decideReport` | Gemeldete Inserate mit den Gründen der Meldenden; wieder freigeben (Meldungen werden gelöscht) oder entfernen (Grund freiwillig). Club-Angebote für Samen und Stecklinge entfernt nur das Team. |
+| Mitglieder | `warnMember`, `blockMarket`, `unblockMarket` | Liste nur mit Anzeigenamen, Verwarnungen und Sperren. Verwarnen und Sperren im Marktplatz (1, 3, 7 oder 30 Tage: keine neuen Inserate und keine Anfragen) mit Pflicht-Grund. Nur nach unten: Moderatoren regeln Mitglieder, das Team auch Moderatoren. |
+| Ankündigungen | `postAnnouncement`, `deleteAnnouncement` | An alle aktiven Mitglieder, 30 Tage sichtbar, höchstens 20 gleichzeitig und 3 angeheftet. Nur intern, keine Werbung nach außen (§ 6 KCanG). |
+| Protokoll | `moderationOverview` | Die letzten 50 Aktionen (`clubs/{clubId}/modLog`, 1 Jahr). Die betroffene Person sieht ihre Einträge mit Grund unter „Hinweise vom Club“ und im Datenexport. |
+
+`moderationOverview` liefert alles für den Reiter in einem Aufruf; die App lädt nach jeder Aktion neu. Die Regeln stehen in `rules/moderation.ts` (Backend, getestet) und `ModerationRules` (App).
 
 ### Gemeinsame Club-Boxen
 
@@ -434,7 +448,7 @@ Im Hintergrund-Job: `GrowMonitor(…, clubBoxes = app.clubBoxes)`.
 
 - **Anzeigename:** Andere Mitglieder (Marktplatz) sehen den gewählten Namen, sonst Vorname und Initiale. Der volle Name steht nur dort, wo das Gesetz ihn verlangt (Abgabe-Doku, Team).
 - **Benachrichtigungen:** Reservierungen, Club-Boxen und Marktplatz einzeln (`members/{uid}.notify`). Die Einstellungen sind gespeichert; ausgewertet werden sie, sobald es Server-Pushes für diese Ereignisse gibt (siehe Offene Punkte).
-- **Meine Daten:** `exportMyData` liefert alles über das Mitglied als JSON: Mitgliedschaft, Mitglieds-Eintrag, Reservierungen, dokumentierte Abgaben, Inserate, eigene Boxen und Automationen (Auskunft nach Art. 15 DSGVO). Der Messwert-Verlauf ist ausgenommen.
+- **Meine Daten:** `exportMyData` liefert alles über das Mitglied als JSON: Mitgliedschaft, Mitglieds-Eintrag, Reservierungen, dokumentierte Abgaben, Inserate, Moderations-Einträge über einen und von einem, eigene Boxen und Automationen (Auskunft nach Art. 15 DSGVO). Der Messwert-Verlauf ist ausgenommen.
 - **Reservierung ändern:** `updateReservation`, solange das Team noch nicht bestätigt hat; Tages- und Monatsgrenzen werden ohne die alte Fassung neu geprüft.
 - **Club-Boxen:** anpinnen und ausblenden, nur auf dem eigenen Gerät.
 
@@ -444,7 +458,7 @@ Im Hintergrund-Job: `GrowMonitor(…, clubBoxes = app.clubBoxes)`.
 |---|---|---|
 | Zubehör (Biete, Suche, Tausch, Verschenken) | jedes aktive Mitglied, höchstens 10 offene Inserate | Kategorie, Zustand, Preis (nur bei Biete). Ein Wortfilter (`rules/market.ts`) lehnt Inserate mit Cannabis-, Samen- oder Stecklings-Begriffen ab. Interessenten melden sich mit kurzer Nachricht; der Anbieter sieht Anzeigename und Nachricht. Nach 60 Tagen löscht Firestore das Inserat. |
 | Samen und Stecklinge | **nur das Team** als Club-Angebot, kostenlos | Nach § 20 KCanG gibt nur die Anbauvereinigung Vermehrungsmaterial weiter: persönlich im Club, nach Ausweiskontrolle, höchstens 7 Samen, 5 Stecklinge oder zusammen 5 je Person und Kalendermonat, kein Versand von Stecklingen. Mitglieder fragen an (`requestPropagation` prüft die Grenzen), das Team gibt vor Ort aus (`decidePropagation`), die Ausgabe wird 5 Jahre in `propagationLog` dokumentiert. |
-| Melden | jedes Mitglied | Ab 3 Meldungen ist ein Inserat ausgeblendet, bis das Team es wieder freigibt oder entfernt. |
+| Melden | jedes Mitglied | Ab 3 Meldungen ist ein Inserat ausgeblendet, bis Team oder Moderation es wieder freigibt oder entfernt. Im Marktplatz gesperrte Mitglieder können nicht inserieren und nicht anfragen. |
 
 Das ist keine Rechtsberatung. Die Grenzen stehen gesammelt in `rules/market.ts` und `PropagationLimits` (App) und müssen zusammen geändert werden. Bitte vor dem Start mit eurer Aufsichtsbehörde abstimmen, insbesondere ob die Weitergabe kostenlos oder zum Selbstkostenpreis erfolgen soll.
 
@@ -481,7 +495,7 @@ Nicht abgedeckt: die jährliche Meldung an die Behörde und weitere Vereinspflic
 
 4. Im Ordner `backend`: `firebase deploy --only functions,firestore`
 5. In RevenueCat unter *Integrations → Webhooks*: URL von `revenuecatWebhook` aus der Deploy-Ausgabe eintragen, **HMAC-Signierung** aktivieren und dessen Secret als `REVENUECAT_WEBHOOK_SECRET` hinterlegen (danach erneut deployen). Test-Event senden.
-6. In der Firestore-Konsole prüfen, dass die Löschfristen (TTL) für `expireAt` in `dispensations`, `reservations`, `history`, `stats`, `listings`, `propagationRequests` und `propagationLog` aktiv sind. Firestore löscht abgelaufene Dokumente meist innerhalb von 24 Stunden.
+6. In der Firestore-Konsole prüfen, dass die Löschfristen (TTL) für `expireAt` in `dispensations`, `reservations`, `history`, `stats`, `listings`, `propagationRequests`, `propagationLog`, `ledger`, `adRewards`, `modLog` und `announcements` aktiv sind (stehen in `firestore.indexes.json` und werden mit deployt). Firestore löscht abgelaufene Dokumente meist innerhalb von 24 Stunden.
 
 Ablauf im Hintergrund: Kauft der Inhaber, verlängert oder kündigt, meldet RevenueCat das per Webhook. Das Backend gleicht dann den ganzen Club ab und gibt den 4 Team-Plätzen Social Club bis einen Tag nach dem Abo-Ende des Inhabers frei, oder entzieht es. Zusätzlich läuft jede Nacht um 4 Uhr ein Abgleich aller Clubs als Sicherheitsnetz.
 
