@@ -137,7 +137,13 @@ fun GrowScreen(
                         val historyViewModel: HistoryViewModel = viewModel(key = "history-$boxId") {
                             HistoryViewModel(history, boxId, subscriptions)
                         }
-                        HistoryScreen(item.box, historyViewModel, onUpgradeClick, onBack = { route = ROUTE_BOX + boxId })
+                        val lightReadings by remember(boxId) { light.readings(boxId, limit = 200) }
+                            .collectAsStateWithLifecycle(initialValue = emptyList())
+                        HistoryScreen(
+                            item.box, historyViewModel, onUpgradeClick, onBack = { route = ROUTE_BOX + boxId },
+                            lightReadings = lightReadings,
+                            co2Ppm = item.state.reading(Metric.CO2)?.value,
+                        )
                     }
                 }
                 route.startsWith(ROUTE_JOURNAL) -> {

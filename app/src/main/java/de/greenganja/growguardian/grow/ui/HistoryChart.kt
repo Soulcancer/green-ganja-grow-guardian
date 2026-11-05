@@ -45,6 +45,10 @@ internal fun HistoryChart(
     toMillis: Long,
     dailyValues: Boolean,
     modifier: Modifier = Modifier,
+    /** Beschriftung der Y-Achse; Standard: Nachkommastellen der Messgröße. */
+    formatValue: (Double) -> String = metric::formatNumber,
+    /** Untergrenze der Y-Achse, z. B. 0 für Licht. */
+    yFloor: Double? = null,
 ) {
     val shown = HistoryMath.downsample(points, 240)
     val values = shown.flatMap { listOf(it.low, it.high) } + listOfNotNull(target?.min, target?.max)
@@ -52,7 +56,7 @@ internal fun HistoryChart(
     val rawMin = values.min()
     val rawMax = values.max()
     val pad = ((rawMax - rawMin) * 0.12).coerceAtLeast(if (metric.decimals >= 2) 0.05 else 0.5)
-    val yMin = rawMin - pad
+    val yMin = (rawMin - pad).let { if (yFloor != null) maxOf(yFloor, it) else it }
     val yMax = rawMax + pad
     val span = (toMillis - fromMillis).coerceAtLeast(1)
     val lineColor = GrowPalette.Green
@@ -65,7 +69,7 @@ internal fun HistoryChart(
                 listOf(yMax, (yMax + yMin) / 2, yMin).forEachIndexed { index, value ->
                     if (index > 0) Box(modifier = Modifier.weight(1f))
                     Text(
-                        text = metric.formatNumber(value),
+                        text = formatValue(value),
                         modifier = Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

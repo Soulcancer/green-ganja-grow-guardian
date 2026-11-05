@@ -35,6 +35,10 @@ data class HistoryUiState(
     val metrics: List<Metric>
         get() = (samples.flatMap { it.values.keys } + daily.flatMap { it.values.keys }).toSet().sortedBy { it.ordinal }
 
+    /** Reiter: Messgrößen mit Daten plus immer „Licht“ (zeigt ohne Lichtsensor die Einzelmessungen). */
+    val tabs: List<Metric>
+        get() = (metrics + Metric.LIGHT).distinct().sortedBy { it.ordinal }
+
     fun points(metric: Metric): List<ChartPoint> =
         if (range.usesDailyStats) HistoryMath.dailyPoints(daily, metric) else HistoryMath.samplePoints(samples, metric)
 }
@@ -84,7 +88,7 @@ class HistoryViewModel(
                     _state.update { it.copy(loading = false, samples = samples, daily = emptyList()) }
                 }
                 // Gewählte Messgröße hat keine Daten: auf die erste vorhandene wechseln
-                _state.update { s -> if (s.metric in s.metrics || s.metrics.isEmpty()) s else s.copy(metric = s.metrics.first()) }
+                _state.update { s -> if (s.metric in s.tabs || s.metrics.isEmpty()) s else s.copy(metric = s.metrics.first()) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

@@ -36,6 +36,8 @@ import de.greenganja.growguardian.grow.Metric
 import de.greenganja.growguardian.grow.history.HistoryMath
 import de.greenganja.growguardian.grow.history.HistoryRange
 import de.greenganja.growguardian.grow.history.Trend
+import de.greenganja.growguardian.grow.light.LightMath
+import de.greenganja.growguardian.grow.light.LightReading
 import de.greenganja.growguardian.ui.theme.GrowPalette
 
 /** Analyse einer Box wie im Entwurf: Reiter je Messgröße, Zeitraum, Diagramm und Zusammenfassung. */
@@ -45,6 +47,9 @@ internal fun HistoryScreen(
     viewModel: HistoryViewModel,
     onUpgradeClick: () -> Unit,
     onBack: () -> Unit,
+    /** Einzelmessungen aus dem Lichtmodul, für den Licht-Reiter ohne Lichtsensor. */
+    lightReadings: List<LightReading> = emptyList(),
+    co2Ppm: Double? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val metric = state.metric
@@ -61,7 +66,7 @@ internal fun HistoryScreen(
         ) {
             item {
                 // Reiter wie "Temperatur | Luftfeuchtigkeit | VPD" im Entwurf
-                val tabs = state.metrics.ifEmpty { listOf(Metric.AIR_TEMPERATURE, Metric.AIR_HUMIDITY, Metric.VPD) }
+                val tabs = if (state.metrics.isEmpty()) listOf(Metric.AIR_TEMPERATURE, Metric.AIR_HUMIDITY, Metric.VPD, Metric.LIGHT) else state.tabs
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -84,7 +89,14 @@ internal fun HistoryScreen(
                     }
                 }
             }
-            item {
+            if (metric == Metric.LIGHT) item {
+                val lightTarget = LightMath.target(box.phase, co2Ppm)
+                val view = LightHistoryView.of(
+                    box, points, state.range.usesDailyStats, lightReadings, state.fromMillis, state.toMillis, lightTarget,
+                )
+                LightHistorySection(view, lightTarget, state.fromMillis, state.toMillis, state.loading)
+            }
+            if (metric != Metric.LIGHT) item {
                 GrowCard {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -124,7 +136,7 @@ internal fun HistoryScreen(
                     }
                 }
             }
-            if (summary != null) {
+            if (summary != null && metric != Metric.LIGHT) {
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         StatTile("Min.", metric.format(summary.min), Modifier.weight(1f))
