@@ -189,47 +189,11 @@ internal fun DeleteDialog(name: String, onDismiss: () -> Unit, onConfirm: () -> 
     )
 }
 
-/** Hat die Box eine Pflanze (Sorte oder Starttag)? */
-internal val GrowBox.hasPlant: Boolean get() = !strain.isNullOrBlank() || plantedAt != null
-
-internal fun GrowBox.plantLabel(): String = strain?.takeIf { it.isNotBlank() } ?: "Pflanze ohne Sorte"
-
-/**
- * Pflanze aus der Box entfernen, z. B. nach der Ernte: Sorte und Starttag weg, die Box mit Sensoren,
- * Zielwerten, Verlauf und Automationen bleibt. Tagebuch nur auf Wunsch.
- */
-@Composable
-internal fun RemovePlantDialog(box: GrowBox, onDismiss: () -> Unit, onConfirm: (deleteJournal: Boolean, resetPhase: Boolean) -> Unit) {
-    var deleteJournal by remember { mutableStateOf(false) }
-    var resetPhase by remember { mutableStateOf(true) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("„${box.plantLabel()}“ entfernen?") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Sorte und Starttag werden aus „${box.name}“ entfernt. Box, Sensoren, Zielwerte, Verlauf und Automationen bleiben, du kannst gleich eine neue Pflanze eintragen.")
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = resetPhase, onCheckedChange = { resetPhase = it })
-                    Text("Phase auf „${GrowPhase.SEEDLING.label}“ zurücksetzen")
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = deleteJournal, onCheckedChange = { deleteJournal = it })
-                    Text("Tagebuch-Einträge auch löschen")
-                }
-                if (deleteJournal) Text("Die Einträge sind danach weg.", color = MaterialTheme.colorScheme.error)
-            }
-        },
-        confirmButton = { TextButton(onClick = { onConfirm(deleteJournal, resetPhase) }) { Text("Pflanze entfernen", color = MaterialTheme.colorScheme.error) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
-    )
-}
-
 /** Aktionen zu einer Box aus der Übersicht. */
 @Composable
 internal fun BoxActionsDialog(
     box: GrowBox,
     onOpen: () -> Unit,
-    onRemovePlant: (() -> Unit)?,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -238,12 +202,7 @@ internal fun BoxActionsDialog(
         title = { Text(box.name) },
         text = {
             Column {
-                TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text("Öffnen", modifier = Modifier.fillMaxWidth()) }
-                if (onRemovePlant != null) {
-                    TextButton(onClick = onRemovePlant, modifier = Modifier.fillMaxWidth()) {
-                        Text("Pflanze entfernen („${box.plantLabel()}“)", modifier = Modifier.fillMaxWidth())
-                    }
-                }
+                TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text("Öffnen: Pflanzen, Werte, Tagebuch", modifier = Modifier.fillMaxWidth()) }
                 TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
                     Text("Box löschen", color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth())
                 }

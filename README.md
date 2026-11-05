@@ -286,10 +286,14 @@ Premium und Social Club können Steckdosen und Schaltleisten automatisch schalte
 - **Voraussetzung:** Der Sensor muss online sein und seine Werte an die Tuya-Cloud melden. Geräte, die nur lokal (Bluetooth) verbunden sind, lösen keine Cloud-Automation aus.
 - **Steckdosen:** Als schaltbar gelten Bool-Datenpunkte mit dem Code `switch` oder `switch_<n>` (Steckdosenleisten zeigen „Dose n“). Eigene Codes erkennt `DpMapping.isSwitchCode` nicht.
 
+### Mehrere Pflanzen je Box
+
+Jede Box (jedes Zelt) hat beliebig viele Pflanzen, höchstens 50 (`grow/plants/Plant.kt`, `users/{uid}/growBoxes/{boxId}/plants`): Name, Sorte, Samen oder Steckling, Automatik ja/nein, Starttag, Blütebeginn, Notiz; „Ernten“ setzt Erntetag und Trockengewicht, die Pflanze wandert zu „Geerntet“. Box, Sensoren, Zielwerte und Phase teilen sich alle Pflanzen der Box. Tagebuch-Einträge lassen sich einer Pflanze oder der ganzen Box zuordnen (`plantId`). Ohne Social Club zeigt die App ab der vierten wachsenden Pflanze einen Hinweis auf § 9 KCanG (privat 3 Pflanzen je volljähriger Person). Alte Boxen mit Sorte und Starttag direkt an der Box werden beim ersten Öffnen als „Pflanze 1“ übernommen.
+
 ### Boxen und Pflanzen löschen
 
 - **Box löschen:** in der Übersicht über ⋮ an jeder Box (auch an gesperrten) oder in der Box-Ansicht über den Papierkorb oben. `deleteGrowBox` löscht die Box mit Verlauf, Statistik, Tagebuch und Lichtmessungen (`recursiveDelete`), ihre Automationen und für den Club geteilte Ansichten der Box. Die Sensoren bleiben im Konto; nach dem Löschen einer aktiven Box rückt eine gesperrte nach.
-- **Pflanze entfernen** (z. B. nach der Ernte): Sorte und Starttag werden geleert, auf Wunsch Phase zurück auf „Keimling / Steckling“ und alle Tagebuch-Einträge gelöscht (`JournalRepository.deleteAll`, in Paketen zu 400). Box, Sensoren, Zielwerte, Verlauf und Automationen bleiben. Erreichbar über ⋮ in der Übersicht, die Pflanzen-Karte in der Box-Ansicht und das Tagebuch.
+- **Pflanze löschen:** an der Pflanze in der Box-Ansicht; auf Wunsch mit ihren Tagebuch-Einträgen, und bei der letzten wachsenden Pflanze die Box-Phase zurück auf „Keimling / Steckling“. Nach der Ernte besser „Ernten“, dann bleibt die Pflanze mit Ertrag erhalten.
 
 ### Grow-Tagebuch
 

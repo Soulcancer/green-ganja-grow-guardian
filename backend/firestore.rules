@@ -124,6 +124,14 @@ service cloud.firestore {
           && request.resource.data.get('expireAt', null) == resource.data.get('expireAt', null);
       }
 
+      // Pflanzen einer Box: der Nutzer schreibt selbst, in festem Format
+      match /plants/{plantId} {
+        allow read, delete: if isUser(uid);
+        allow create, update: if isUser(uid)
+          && validPlant(request.resource.data)
+          && exists(/databases/$(database)/documents/users/$(uid)/growBoxes/$(boxId));
+      }
+
       // Grow-Tagebuch: der Nutzer schreibt selbst, in festem Format
       match /journal/{entryId} {
         allow read, delete: if isUser(uid);
@@ -163,8 +171,32 @@ service cloud.firestore {
         || ((data[field] is number) && data[field] >= min && data[field] <= max);
     }
 
+    function optionalDate(data, field) {
+      return !(field in data) || data[field] == null
+        || (data[field] is string && data[field].matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+    }
+
+    function optionalText(data, field, max) {
+      return !(field in data) || data[field] == null || (data[field] is string && data[field].size() <= max);
+    }
+
+    function validPlant(data) {
+      return data.keys().hasOnly(['name', 'strain', 'origin', 'autoflower', 'startedAt', 'floweringAt', 'harvestedAt',
+          'yieldDryG', 'notes', 'createdAt', 'updatedAt'])
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 40
+        && optionalText(data, 'strain', 60)
+        && (!('origin' in data) || data.origin == null || data.origin in ['seed', 'clone'])
+        && (!('autoflower' in data) || data.autoflower is bool)
+        && optionalDate(data, 'startedAt')
+        && optionalDate(data, 'floweringAt')
+        && optionalDate(data, 'harvestedAt')
+        && optionalNumber(data, 'yieldDryG', 0, 5000)
+        && optionalText(data, 'notes', 500);
+    }
+
     function validJournal(data) {
-      return data.keys().hasOnly(['date', 'watered', 'waterMl', 'nutrientsMl', 'values', 'notes', 'createdAt', 'updatedAt'])
+      return data.keys().hasOnly(['date', 'watered', 'waterMl', 'nutrientsMl', 'values', 'notes', 'plantId', 'createdAt', 'updatedAt'])
+        && optionalText(data, 'plantId', 128)
         && data.date is string && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && data.watered is bool
         && optionalNumber(data, 'waterMl', 0, 100000)

@@ -39,6 +39,10 @@ import de.greenganja.growguardian.grow.Metric
 import de.greenganja.growguardian.grow.journal.JournalEntry
 import de.greenganja.growguardian.grow.journal.JournalRepository
 import de.greenganja.growguardian.grow.journal.JournalRules
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import de.greenganja.growguardian.grow.plants.PlantRules
+import de.greenganja.growguardian.grow.plants.Plant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
@@ -100,13 +104,12 @@ internal fun JournalScreen(
     onSaveBox: (GrowBox) -> Unit,
     onMessage: (String) -> Unit,
     onBack: () -> Unit,
-    onRemovePlant: ((deleteJournal: Boolean, resetPhase: Boolean) -> Unit)? = null,
+    /** Pflanzen der Box: Einträge lassen sich einer Pflanze zuordnen. */
+    plants: List<Plant> = emptyList(),
 ) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<JournalEntry?>(null) }
-    var editBox by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<JournalEntry?>(null) }
-    var removing by remember { mutableStateOf(false) }
     val today = viewModel.today()
 
     LaunchedEffect(viewModel) { viewModel.messages.collect(onMessage) }
@@ -114,7 +117,7 @@ internal fun JournalScreen(
     val current = editing
     if (current != null) {
         BackHandler { editing = null }
-        EntryEditor(current, onSave = { entry -> viewModel.save(entry).also { if (it == null) editing = null } }, onBack = { editing = null })
+        EntryEditor(current, plants, onSave = { entry -> viewModel.save(entry).also { if (it == null) editing = null } }, onBack = { editing = null })
         return
     }
 
@@ -128,22 +131,17 @@ internal fun JournalScreen(
             item {
                 GrowCard {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(box.strain ?: "Sorte noch nicht eingetragen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        val day = JournalRules.growDay(box.plantedAt, today)
-                        Muted(
-                            listOfNotNull(
-                                box.phase.label,
-                                box.plantedAt?.let { "Start ${formatDate(it)}" },
-                                day?.let { "Tag $it (${JournalRules.weekLabel(it)})" },
-                            ).joinToString(" · "),
+                        val active = plants.filter { it.active }
+                        Text(
+                            when (active.size) { 0 -> "Keine wachsende Pflanze"; 1 -> active.first().name; else -> "${active.size} Pflanzen" },
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                         )
-                        JournalRules.lastWatered(entries.orEmpty())?.let { Muted("Zuletzt gegossen: ${formatDate(it)}") }
-                        Row {
-                            TextButton(onClick = { editBox = true }) { Text("Sorte und Start bearbeiten") }
-                            if (box.hasPlant && onRemovePlant != null) {
-                                TextButton(onClick = { removing = true }) { Text("Pflanze entfernen", color = MaterialTheme.colorScheme.error) }
-                            }
+                        active.forEach { plant ->
+                            Muted(listOf(plant.name, PlantRules.details(plant), PlantRules.status(plant, today)).filter { it.isNotEmpty() }.joinToString(" · "))
                         }
+                        Muted(box.phase.label)
+                        JournalRules.lastWatered(entries.orEmpty())?.let { Muted("Zuletzt gegossen: ${formatDate(it)}") }
+                        if (plants.isEmpty()) Muted("Pflanzen legst du in der Box-Ansicht an. Einträge kannst du dann einer Pflanze zuordnen.")
                     }
                 }
             }
@@ -157,7 +155,13 @@ internal fun JournalScreen(
                     Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(formatDate(entry.date), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                            JournalRules.growDay(box.plantedAt, entry.date)?.let { Muted("Tag $it") }
+                            val plant = plants.firstOrNull { it.id == entry.plantId }
+                            Muted(
+                                listOfNotNull(
+                                    plant?.name ?: entry.plantId?.let { "Gelöschte Pflanze" } ?: "Ganze Box".takeIf { plants.size > 1 },
+                                    plant?.let { p -> JournalRules.growDay(p.startedAt, entry.date)?.let { "Tag $it" } },
+                                ).joinToString(" · "),
+                            )
                         }
                         val facts = listOfNotNull(
                             ("Gegossen" + (entry.waterMl?.let { " ${ml(it)}" } ?: "")).takeIf { entry.watered },
@@ -173,38 +177,6 @@ internal fun JournalScreen(
         }
     }
 
-    if (editBox) {
-        var strain by remember { mutableStateOf(box.strain.orEmpty()) }
-        var planted by remember { mutableStateOf(box.plantedAt.orEmpty()) }
-        val plantedOk = planted.isBlank() || (runCatching { LocalDate.parse(planted) }.isSuccess && planted <= today)
-        AlertDialog(
-            onDismissRequest = { editBox = false },
-            title = { Text("Sorte und Start") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = strain, onValueChange = { strain = it.take(60) }, label = { Text("Sorte") }, singleLine = true)
-                    OutlinedTextField(
-                        value = planted, onValueChange = { planted = it.take(10) }, label = { Text("Starttag (JJJJ-MM-TT)") },
-                        singleLine = true, isError = !plantedOk,
-                    )
-                    TextButton(onClick = { planted = today }) { Text("Heute") }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    editBox = false
-                    onSaveBox(box.copy(strain = strain.trim().ifBlank { null }, plantedAt = planted.ifBlank { null }))
-                }, enabled = plantedOk) { Text("Speichern") }
-            },
-            dismissButton = { TextButton(onClick = { editBox = false }) { Text("Abbrechen") } },
-        )
-    }
-    if (removing && onRemovePlant != null) {
-        RemovePlantDialog(box, onDismiss = { removing = false }, onConfirm = { deleteJournal, resetPhase ->
-            removing = false
-            onRemovePlant(deleteJournal, resetPhase)
-        })
-    }
     deleting?.let { entry ->
         AlertDialog(
             onDismissRequest = { deleting = null },
@@ -217,7 +189,8 @@ internal fun JournalScreen(
 }
 
 @Composable
-private fun EntryEditor(initial: JournalEntry, onSave: (JournalEntry) -> String?, onBack: () -> Unit) {
+private fun EntryEditor(initial: JournalEntry, plants: List<Plant>, onSave: (JournalEntry) -> String?, onBack: () -> Unit) {
+    var plantId by remember { mutableStateOf(initial.plantId) }
     var date by remember { mutableStateOf(initial.date) }
     var watered by remember { mutableStateOf(initial.watered) }
     var water by remember { mutableStateOf(initial.waterMl?.let(::plain).orEmpty()) }
@@ -234,6 +207,15 @@ private fun EntryEditor(initial: JournalEntry, onSave: (JournalEntry) -> String?
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item { OutlinedTextField(value = date, onValueChange = { date = it.take(10) }, label = { Text("Datum (JJJJ-MM-TT)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            val choosable = plants.filter { it.active || it.id == initial.plantId }
+            if (choosable.isNotEmpty()) {
+                item {
+                    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PlantChip("Ganze Box", plantId == null) { plantId = null }
+                        choosable.forEach { p -> PlantChip(p.name, plantId == p.id) { plantId = p.id } }
+                    }
+                }
+            }
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = watered, onCheckedChange = { watered = it })
@@ -262,11 +244,27 @@ private fun EntryEditor(initial: JournalEntry, onSave: (JournalEntry) -> String?
                         nutrientsMl = parseNumber(nutrients),
                         values = values.mapNotNull { (m, text) -> parseNumber(text)?.let { m to it } }.toMap(),
                         notes = notes.trim().ifBlank { null },
+                        plantId = plantId,
                     )
                     error = onSave(entry)
                 }, modifier = Modifier.fillMaxWidth()) { Text("Speichern") }
             }
         }
+    }
+}
+
+@Composable
+private fun PlantChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    androidx.compose.material3.Surface(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+    ) {
+        Text(
+            text, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelLarge,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

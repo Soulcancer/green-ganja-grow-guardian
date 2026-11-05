@@ -27,6 +27,8 @@ data class JournalEntry(
     /** Von Hand gemessene Werte, z. B. pH aus dem Tropfentest. */
     val values: Map<Metric, Double> = emptyMap(),
     val notes: String? = null,
+    /** Betrifft nur diese Pflanze; null = ganze Box. */
+    val plantId: String? = null,
 ) {
     val isEmpty: Boolean get() = !watered && waterMl == null && nutrientsMl == null && values.isEmpty() && notes.isNullOrBlank()
 }
@@ -107,6 +109,7 @@ class JournalRepository(
             "nutrientsMl" to entry.nutrientsMl,
             "values" to entry.values.mapKeys { it.key.id },
             "notes" to entry.notes?.trim()?.ifBlank { null },
+            "plantId" to entry.plantId,
             "updatedAt" to FieldValue.serverTimestamp(),
         )
         if (entry.id.isEmpty()) data["createdAt"] = FieldValue.serverTimestamp()
@@ -144,5 +147,6 @@ internal fun DocumentSnapshot.toJournalEntry(): JournalEntry? {
         nutrientsMl = getDouble("nutrientsMl"),
         values = values,
         notes = getString("notes"),
+        plantId = getString("plantId"),
     )
 }

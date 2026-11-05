@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Edit
-import de.greenganja.growguardian.grow.journal.JournalRules
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
@@ -49,6 +48,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.greenganja.growguardian.grow.Metric
+import de.greenganja.growguardian.grow.plants.PlantRules
+import de.greenganja.growguardian.grow.plants.Plant
 import de.greenganja.growguardian.grow.SensorDevice
 import de.greenganja.growguardian.ui.theme.GrowPalette
 import java.util.Locale
@@ -57,7 +58,6 @@ private const val DIALOG_EDIT = "edit"
 private const val DIALOG_DEVICES = "devices"
 private const val DIALOG_TARGETS = "targets"
 private const val DIALOG_DELETE = "delete"
-private const val DIALOG_REMOVE_PLANT = "remove-plant"
 
 /** Detailansicht einer Box: Kacheln, alle Messwerte mit Zielbereich, Sensoren und Zielwerte. */
 @Composable
@@ -75,6 +75,49 @@ internal fun BoxDetail(
 ) {
     val box = item.box
     var dialog by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingPlant by remember { mutableStateOf<Plant?>(null) }
+    var harvestingPlant by remember { mutableStateOf<Plant?>(null) }
+    var deletingPlant by remember { mutableStateOf<Plant?>(null) }
+    val today = java.time.LocalDate.now(java.time.ZoneId.of("Europe/Berlin")).toString()
+
+    editingPlant?.let { plant ->
+        androidx.activity.compose.BackHandler { editingPlant = null }
+        PlantEditor(
+            initial = plant,
+            today = today,
+            existingCount = state.activePlantCount,
+            onSave = { edited ->
+                PlantRules.validate(edited, today, item.plants.size) ?: run {
+                    viewModel.savePlant(box.id, edited)
+                    editingPlant = null
+                    null
+                }
+            },
+            onBack = { editingPlant = null },
+        )
+        return
+    }
+    harvestingPlant?.let { plant ->
+        HarvestDialog(plant, today, onDismiss = { harvestingPlant = null }, onConfirm = { harvested ->
+            PlantRules.validate(harvested, today) ?: run {
+                viewModel.savePlant(box.id, harvested, "„${plant.name}“ geerntet.")
+                harvestingPlant = null
+                null
+            }
+        })
+    }
+    deletingPlant?.let { plant ->
+        DeletePlantDialog(
+            plant = plant,
+            boxName = box.name,
+            lastActive = plant.active && item.activePlants.size == 1,
+            onDismiss = { deletingPlant = null },
+            onConfirm = { deleteJournal, resetPhase ->
+                deletingPlant = null
+                viewModel.deletePlant(box, plant, deleteJournal, resetPhase)
+            },
+        )
+    }
 
     if (dialog == DIALOG_EDIT) {
         BoxWizard(
@@ -112,22 +155,16 @@ internal fun BoxDetail(
                     else StatusChip(item.state.status.label, item.state.status.color)
                 }
             }
-            if (box.hasPlant) {
-                item {
-                    GrowCard {
-                        Row(modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            IconBadge(Icons.Filled.Spa, size = 34)
-                            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                                Text(box.plantLabel(), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                                val today = java.time.LocalDate.now(java.time.ZoneId.of("Europe/Berlin")).toString()
-                                val day = JournalRules.growDay(box.plantedAt, today)
-                                Muted(listOfNotNull(box.plantedAt?.let { "Start $it" }, day?.let { "Tag $it · ${JournalRules.weekLabel(it)}" }).joinToString(" · ").ifEmpty { "Ohne Starttag" })
-                            }
-                            if (!item.locked) PillAction("Entfernen", onClick = { dialog = DIALOG_REMOVE_PLANT }, enabled = !state.busy)
-                        }
-                    }
-                }
-            }
+            plantItems(
+                item = item,
+                today = today,
+                kcangHint = state.kcangHint,
+                busy = state.busy,
+                onAdd = { editingPlant = Plant(name = PlantRules.nextName(item.plants)) },
+                onOpen = { editingPlant = it },
+                onHarvest = { harvestingPlant = it },
+                onDelete = { deletingPlant = it },
+            )
             inlineAd("box-detail-top")
             if (item.locked) {
                 item { LockedBanner(onUpgradeClick) }
@@ -251,14 +288,6 @@ internal fun BoxDetail(
             onDismiss = { dialog = null },
             onConfirm = { targets ->
                 viewModel.setTargets(box, targets)
-                dialog = null
-            },
-        )
-        DIALOG_REMOVE_PLANT -> RemovePlantDialog(
-            box = box,
-            onDismiss = { dialog = null },
-            onConfirm = { deleteJournal, resetPhase ->
-                viewModel.removePlant(box, deleteJournal, resetPhase)
                 dialog = null
             },
         )

@@ -56,6 +56,7 @@ import de.greenganja.growguardian.grow.SensorSource
 import de.greenganja.growguardian.grow.automation.GrowAutomations
 import de.greenganja.growguardian.grow.journal.JournalRepository
 import de.greenganja.growguardian.grow.light.LightRepository
+import de.greenganja.growguardian.grow.plants.PlantRepository
 import de.greenganja.growguardian.grow.light.PhoneLightSensor
 import de.greenganja.growguardian.grow.history.GrowHistoryRepository
 import de.greenganja.growguardian.tuya.TuyaPairing
@@ -92,8 +93,9 @@ fun GrowScreen(
     wallet: kotlinx.coroutines.flow.Flow<de.greenganja.growguardian.rewards.Wallet>? = null,
     journal: JournalRepository = remember { JournalRepository() },
     light: LightRepository = remember { LightRepository() },
+    plantRepository: PlantRepository = remember { PlantRepository() },
     modifier: Modifier = Modifier,
-    viewModel: GrowViewModel = viewModel { GrowViewModel(repository, sensors, subscriptions, automations, wallet, journal) },
+    viewModel: GrowViewModel = viewModel { GrowViewModel(repository, sensors, subscriptions, automations, wallet, journal, plantRepository) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -164,7 +166,7 @@ fun GrowScreen(
                             onSaveBox = viewModel::saveBox,
                             onMessage = { text -> scope.launch { snackbar.showSnackbar(text) } },
                             onBack = { route = ROUTE_BOX + boxId },
-                            onRemovePlant = { deleteJournal, resetPhase -> viewModel.removePlant(item.box, deleteJournal, resetPhase) },
+                            plants = item.plants,
                         )
                     }
                 }
@@ -239,7 +241,6 @@ fun GrowScreen(
                 else -> Overview(
                     state = state,
                     onDelete = { viewModel.deleteBox(it.id) },
-                    onRemovePlant = viewModel::removePlant,
                     onOpen = { route = ROUTE_BOX + it },
                     onNew = { route = ROUTE_NEW },
                     onPair = pairing?.let { { route = ROUTE_PAIR } },
@@ -255,7 +256,6 @@ fun GrowScreen(
 private fun Overview(
     state: GrowUiState,
     onDelete: (GrowBox) -> Unit,
-    onRemovePlant: (GrowBox, Boolean, Boolean) -> Unit,
     onOpen: (String) -> Unit,
     onNew: () -> Unit,
     onPair: (() -> Unit)?,
@@ -264,21 +264,16 @@ private fun Overview(
 ) {
     var menuFor by remember { mutableStateOf<GrowBox?>(null) }
     var deleting by remember { mutableStateOf<GrowBox?>(null) }
-    var removingPlant by remember { mutableStateOf<GrowBox?>(null) }
     menuFor?.let { box ->
         BoxActionsDialog(
             box = box,
             onOpen = { menuFor = null; onOpen(box.id) },
-            onRemovePlant = if (box.hasPlant) ({ menuFor = null; removingPlant = box }) else null,
             onDelete = { menuFor = null; deleting = box },
             onDismiss = { menuFor = null },
         )
     }
     deleting?.let { box ->
         DeleteDialog(name = box.name, onDismiss = { deleting = null }, onConfirm = { deleting = null; onDelete(box) })
-    }
-    removingPlant?.let { box ->
-        RemovePlantDialog(box, onDismiss = { removingPlant = null }, onConfirm = { journal, reset -> removingPlant = null; onRemovePlant(box, journal, reset) })
     }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -322,6 +317,7 @@ private fun Overview(
                 }
             }
         }
+        state.kcangHint?.let { hint -> item { Muted(hint, color = GrowPalette.Warning) } }
         item {
             SectionHeader("Aktive Boxen") {
                 PillAction(text = "+ Neue Box", onClick = if (state.access.canAddBox) onNew else onUpgradeClick)
@@ -389,7 +385,15 @@ private fun BoxRow(item: BoxItem, sensorsLoading: Boolean, onClick: () -> Unit, 
             IconBadge(if (item.locked) Icons.Filled.Lock else Icons.Filled.Spa, tint = if (item.locked) GrowPalette.TextMuted else GrowPalette.Green, size = 48)
             Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(text = box.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                Muted(listOfNotNull(box.strain?.takeIf { it.isNotBlank() }, box.phase.label, box.medium.label).joinToString(" · "), maxLines = 1)
+                val plantCount = item.activePlants.size
+                Muted(
+                    listOfNotNull(
+                        when (plantCount) { 0 -> null; 1 -> item.activePlants.first().strain ?: "1 Pflanze"; else -> "$plantCount Pflanzen" },
+                        box.phase.label,
+                        box.medium.label,
+                    ).joinToString(" · "),
+                    maxLines = 1,
+                )
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 when {
