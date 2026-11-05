@@ -630,7 +630,7 @@ private fun ReadingCard(reading: LightReading, target: de.greenganja.growguardia
 
 /** Lampen bearbeiten: Art, Leistung, Anzahl; Fläche, Dimmer, Lichtstunden. */
 @Composable
-private fun LampEditor(
+internal fun LampEditor(
     initial: LightSetup,
     phase: GrowPhase,
     allLampTypes: Boolean,

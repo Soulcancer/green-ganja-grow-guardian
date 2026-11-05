@@ -71,6 +71,7 @@ internal fun BoxDetail(
     onAutomations: (() -> Unit)? = null,
     onJournal: (() -> Unit)? = null,
     onLight: (() -> Unit)? = null,
+    onSetup: (() -> Unit)? = null,
     onBack: () -> Unit,
 ) {
     val box = item.box
@@ -177,6 +178,17 @@ internal fun BoxDetail(
                     }
                 }
                 item { Readings(item, sensorsLoading = state.sensorsLoading) }
+                if (onSetup != null) {
+                    item {
+                        val (done, total) = AppWizardContent.boxProgress(item, state.access.features.alerts)
+                        UpgradeLikeRow(
+                            icon = Icons.Filled.Edit,
+                            title = "Einrichtung",
+                            subtitle = if (done >= total) "Alles eingerichtet · Assistent erneut öffnen" else "$done von $total Schritten erledigt · weiter einrichten",
+                            onClick = onSetup,
+                        )
+                    }
+                }
                 if (onHistory != null) {
                     item {
                         UpgradeLikeRow(
@@ -404,7 +416,7 @@ private fun UpgradeLikeRow(icon: ImageVector, title: String, subtitle: String, o
  * Ohne Premium oder Social Club führt der Schalter zum Upgrade.
  */
 @Composable
-private fun AlarmCard(enabled: Boolean, allowed: Boolean, busy: Boolean, onToggle: (Boolean) -> Unit, onUpgradeClick: () -> Unit) {
+internal fun AlarmCard(enabled: Boolean, allowed: Boolean, busy: Boolean, onToggle: (Boolean) -> Unit, onUpgradeClick: () -> Unit) {
     val context = LocalContext.current
     var permissionMissing by remember { mutableStateOf(!notificationsAllowed(context)) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->

@@ -4,9 +4,19 @@ import { fail } from "./errors";
 import { db } from "./firebase";
 import { OPEN_RESERVATION_STATUSES, type ClubDoc, type MembershipDoc, type ReservationStatus } from "./model";
 
-export function requireUid(request: CallableRequest): string {
+/** Angemeldet, auch ohne bestätigte E-Mail (nur für Konto löschen). */
+export function requireSignedIn(request: CallableRequest): string {
   const uid = request.auth?.uid;
   if (!uid) fail("unauthenticated", "not-signed-in", "Bitte melde dich zuerst an.");
+  return uid;
+}
+
+/** Angemeldet mit bestätigter E-Mail-Adresse; das verlangen alle Functions außer dem Löschen des Kontos. */
+export function requireUid(request: CallableRequest): string {
+  const uid = requireSignedIn(request);
+  if (request.auth?.token?.email_verified !== true) {
+    fail("permission-denied", "email-not-verified", "Bitte bestätige zuerst deine E-Mail-Adresse.");
+  }
   return uid;
 }
 

@@ -37,7 +37,7 @@ import kotlinx.coroutines.tasks.await
 
 /** Anmelden oder registrieren mit E-Mail und Passwort. Registrieren nur mit Bestätigung „ab 18“. */
 @Composable
-fun SignInScreen(auth: FirebaseAuth, initialRegister: Boolean = false, onBack: (() -> Unit)? = null) {
+fun SignInScreen(auth: FirebaseAuth, initialRegister: Boolean = false, onBack: (() -> Unit)? = null, onRegistered: () -> Unit = {}) {
     var register by rememberSaveable { mutableStateOf(initialRegister) }
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -89,8 +89,13 @@ fun SignInScreen(auth: FirebaseAuth, initialRegister: Boolean = false, onBack: (
                 message = null
                 scope.launch {
                     message = try {
-                        if (register) auth.createUserWithEmailAndPassword(email, password).await()
-                        else auth.signInWithEmailAndPassword(email, password).await()
+                        if (register) {
+                            auth.createUserWithEmailAndPassword(email, password).await()
+                            // Bestätigungs-Mail gleich mitschicken; Fehler zeigt der Bestätigungs-Bildschirm
+                            if (sendVerificationMail(auth) == null) onRegistered()
+                        } else {
+                            auth.signInWithEmailAndPassword(email, password).await()
+                        }
                         null
                     } catch (e: FirebaseAuthException) {
                         SignInRules.message(e.errorCode)

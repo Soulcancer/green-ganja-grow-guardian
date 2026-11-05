@@ -34,7 +34,8 @@ export type Reason =
   | "already-claimed"
   | "insufficient-coins"
   | "not-needed"
-  | "lamps-premium";
+  | "lamps-premium"
+  | "email-not-verified";
 
 /** Wirft einen Fehler mit deutscher Meldung, die die App direkt anzeigen kann. */
 export function fail(

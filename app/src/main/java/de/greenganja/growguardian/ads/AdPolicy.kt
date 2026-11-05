@@ -4,11 +4,14 @@ import de.greenganja.growguardian.billing.FarmerTier
 
 /**
  * Wer Werbung sieht: Freemium und Premium. Social Club ist werbefrei, ebenso wer mit Coins „werbefrei“
- * eingelöst hat. Ohne Einwilligungsabfrage (UMP) oder vor deren Ergebnis zeigt die App keine Anzeigen.
+ * eingelöst hat; ausgenommen sind nur die Einführungen (App und Club), dort sehen alle Banner. Ohne Einwilligungsabfrage (UMP) oder vor deren Ergebnis zeigt die App keine Anzeigen.
  */
 object AdPolicy {
     fun showAds(tier: FarmerTier, adFreeUntil: Long, canRequestAds: Boolean, now: Long): Boolean =
         canRequestAds && tier != FarmerTier.SOCIAL_CLUB && now >= adFreeUntil
+
+    /** In den Einführungen (App und Club) sehen alle Stufen Banner, sofern die Einwilligung es erlaubt. */
+    fun showInWizard(canRequestAds: Boolean): Boolean = canRequestAds
 
     /** Mindestabstand zwischen Banner und Bedienelementen, gegen versehentliche Klicks (AdMob-Richtlinie). */
     const val SPACING_DP = 16

@@ -35,7 +35,13 @@ import kotlinx.coroutines.launch
 
 /** Konto: Abo, Werbe-Einwilligung, Rechtstexte, Abmelden und Konto löschen (Pflicht für Google Play). */
 @Composable
-fun AccountScreen(app: GrowGuardianApp, onUpgradeClick: () -> Unit, modifier: Modifier = Modifier) {
+fun AccountScreen(
+    app: GrowGuardianApp,
+    onUpgradeClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onAppTour: (() -> Unit)? = null,
+    onClubTour: (() -> Unit)? = null,
+) {
     val sub by app.subscriptions.state.collectAsStateWithLifecycle()
     val auth = remember { FirebaseAuth.getInstance() }
     val context = LocalContext.current
@@ -70,6 +76,8 @@ fun AccountScreen(app: GrowGuardianApp, onUpgradeClick: () -> Unit, modifier: Mo
                 Text("Werbe-Einwilligung ändern")
             }
         }
+        if (onAppTour != null) OutlinedButton(onClick = onAppTour, modifier = Modifier.fillMaxWidth()) { Text("App-Einführung erneut starten") }
+        if (onClubTour != null) OutlinedButton(onClick = onClubTour, modifier = Modifier.fillMaxWidth()) { Text("Club-Einführung erneut starten") }
         TextButton(onClick = { open(Legal.PRIVACY_URL) }) { Text("Datenschutzerklärung") }
         TextButton(onClick = { open(Legal.TERMS_URL) }) { Text("Nutzungsbedingungen") }
         TextButton(onClick = { open(Legal.IMPRINT_URL) }) { Text("Impressum") }

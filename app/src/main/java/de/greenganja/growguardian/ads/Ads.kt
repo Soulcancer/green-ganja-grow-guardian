@@ -47,6 +47,9 @@ class AdsManager(
     private val consent: ConsentInformation = UserMessagingPlatform.getConsentInformation(appContext)
     private val started = AtomicBoolean(false)
     private val canRequest = MutableStateFlow(consent.canRequestAds())
+
+    /** Einwilligung liegt vor; für die Banner in den Einführungen, die alle Stufen sehen. */
+    val canRequestAds: StateFlow<Boolean> get() = canRequest
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     /** Ändert sich jede Minute, damit „werbefrei bis“ ohne Neustart abläuft. */

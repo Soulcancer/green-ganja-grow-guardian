@@ -27,7 +27,7 @@ class AppShellTest {
         assertEquals("", PaywallText.period(null))
         assertNull(PaywallText.outcome(PurchaseOutcome.Cancelled))
         assertEquals("Willkommen bei Premium Farmer!", PaywallText.outcome(PurchaseOutcome.Success(FarmerTier.PREMIUM)))
-        assertTrue(PaywallText.benefits(FarmerTier.SOCIAL_CLUB).contains("Werbefrei"))
+        assertTrue(PaywallText.benefits(FarmerTier.SOCIAL_CLUB).any { it.startsWith("Werbefrei") })
     }
 
     @Test

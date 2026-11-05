@@ -57,6 +57,7 @@ import de.greenganja.growguardian.grow.automation.GrowAutomations
 import de.greenganja.growguardian.grow.journal.JournalRepository
 import de.greenganja.growguardian.grow.light.LightRepository
 import de.greenganja.growguardian.grow.plants.PlantRepository
+import de.greenganja.growguardian.ui.wizard.OnboardingPrefs
 import de.greenganja.growguardian.grow.light.PhoneLightSensor
 import de.greenganja.growguardian.grow.history.GrowHistoryRepository
 import de.greenganja.growguardian.tuya.TuyaPairing
@@ -72,6 +73,8 @@ private const val ROUTE_HISTORY = "history:"
 private const val ROUTE_AUTOMATIONS = "automations:"
 private const val ROUTE_JOURNAL = "journal:"
 private const val ROUTE_LIGHT = "light:"
+private const val ROUTE_WIZARD = "wizard"
+private const val ROUTE_SETUP = "setup:"
 
 /**
  * Einstieg in die Grow-Box-Überwachung: Übersicht, Box-Details und Assistent für neue Boxen.
@@ -94,18 +97,36 @@ fun GrowScreen(
     journal: JournalRepository = remember { JournalRepository() },
     light: LightRepository = remember { LightRepository() },
     plantRepository: PlantRepository = remember { PlantRepository() },
+    /** Merkt sich die gesehene App-Einführung; null = keine automatische Einführung (Tests, Vorschau). */
+    onboarding: OnboardingPrefs? = null,
+    /** Hochzählen startet die App-Einführung (z. B. aus dem Konto). */
+    wizardRequest: Int = 0,
     modifier: Modifier = Modifier,
     viewModel: GrowViewModel = viewModel { GrowViewModel(repository, sensors, subscriptions, automations, wallet, journal, plantRepository) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
-    var route by rememberSaveable { mutableStateOf(ROUTE_LIST) }
+    var route by rememberSaveable {
+        mutableStateOf(if (onboarding != null && !onboarding.seen(OnboardingPrefs.APP, AppWizardContent.VERSION)) ROUTE_WIZARD else ROUTE_LIST)
+    }
+    var wizardBoxId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pairReturn by rememberSaveable { mutableStateOf(ROUTE_LIST) }
+    val screenScope = rememberCoroutineScope()
+    LaunchedEffect(wizardRequest) { if (wizardRequest > 0) route = ROUTE_WIZARD }
+    val saveLight: (String, de.greenganja.growguardian.grow.light.LightSetup) -> Unit = { boxId, setup ->
+        screenScope.launch {
+            light.saveSetup(boxId, setup)
+                .onSuccess { snackbar.showSnackbar("Lampen gespeichert.") }
+                .onFailure { snackbar.showSnackbar(it.message ?: "Speichern hat nicht geklappt.") }
+        }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.eventFlow.collect { event ->
             when (event) {
                 is GrowEvent.Message -> snackbar.showSnackbar(event.text)
-                is GrowEvent.BoxCreated -> route = ROUTE_BOX + event.boxId
+                // Im Assistenten bleiben; sonst direkt die Einrichtung der neuen Box
+                is GrowEvent.BoxCreated -> if (route == ROUTE_WIZARD) wizardBoxId = event.boxId else route = ROUTE_SETUP + event.boxId
             }
         }
     }
@@ -115,6 +136,12 @@ fun GrowScreen(
             route.startsWith(ROUTE_AUTOMATIONS) -> ROUTE_BOX + route.removePrefix(ROUTE_AUTOMATIONS)
             route.startsWith(ROUTE_JOURNAL) -> ROUTE_BOX + route.removePrefix(ROUTE_JOURNAL)
             route.startsWith(ROUTE_LIGHT) -> ROUTE_BOX + route.removePrefix(ROUTE_LIGHT)
+            route.startsWith(ROUTE_SETUP) -> ROUTE_BOX + route.removePrefix(ROUTE_SETUP)
+            route == ROUTE_WIZARD -> {
+                onboarding?.markSeen(OnboardingPrefs.APP, AppWizardContent.VERSION)
+                ROUTE_LIST
+            }
+            route == ROUTE_PAIR -> pairReturn
             else -> ROUTE_LIST
         }
     }
@@ -131,7 +158,8 @@ fun GrowScreen(
                     val pairingViewModel: PairingViewModel = viewModel { PairingViewModel(pairing) }
                     PairingScreen(pairingViewModel, onClose = {
                         pairingViewModel.restart()
-                        route = ROUTE_LIST
+                        route = pairReturn
+                        pairReturn = ROUTE_LIST
                     })
                 }
                 route.startsWith(ROUTE_HISTORY) && history != null -> {
@@ -169,6 +197,24 @@ fun GrowScreen(
                             plants = item.plants,
                         )
                     }
+                }
+                route == ROUTE_WIZARD || route.startsWith(ROUTE_SETUP) -> {
+                    val full = route == ROUTE_WIZARD
+                    val boxId = if (full) wizardBoxId else route.removePrefix(ROUTE_SETUP)
+                    AppWizard(
+                        mode = if (full) AppWizardMode.FULL else AppWizardMode.BOX,
+                        boxId = boxId,
+                        state = state,
+                        viewModel = viewModel,
+                        onSelectBox = { wizardBoxId = it },
+                        onSaveLight = saveLight,
+                        onPair = pairing?.let { { pairReturn = route; route = ROUTE_PAIR } },
+                        onUpgradeClick = onUpgradeClick,
+                        onFinish = { id ->
+                            if (full) onboarding?.markSeen(OnboardingPrefs.APP, AppWizardContent.VERSION)
+                            route = if (id != null && state.item(id) != null) ROUTE_BOX + id else ROUTE_LIST
+                        },
+                    )
                 }
                 route.startsWith(ROUTE_LIGHT) -> {
                     val boxId = route.removePrefix(ROUTE_LIGHT)
@@ -234,6 +280,7 @@ fun GrowScreen(
                             onAutomations = automations?.let { { route = ROUTE_AUTOMATIONS + item.box.id } },
                             onJournal = { route = ROUTE_JOURNAL + item.box.id },
                             onLight = { route = ROUTE_LIGHT + item.box.id },
+                            onSetup = { route = ROUTE_SETUP + item.box.id },
                             onBack = { route = ROUTE_LIST },
                         )
                     }
@@ -243,7 +290,7 @@ fun GrowScreen(
                     onDelete = { viewModel.deleteBox(it.id) },
                     onOpen = { route = ROUTE_BOX + it },
                     onNew = { route = ROUTE_NEW },
-                    onPair = pairing?.let { { route = ROUTE_PAIR } },
+                    onPair = pairing?.let { { pairReturn = ROUTE_LIST; route = ROUTE_PAIR } },
                     onRetry = viewModel::retrySensors,
                     onUpgradeClick = onUpgradeClick,
                 )

@@ -25,9 +25,14 @@ import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 
 /** Was die Banner-Bausteine wissen müssen; ohne [AdsProvider] erscheinen keine Banner (z. B. in Tests). */
-data class AdsUi(val enabled: Boolean, val units: AdUnits) {
+data class AdsUi(
+    val enabled: Boolean,
+    val units: AdUnits,
+    /** Einwilligung (UMP) erlaubt Anzeigen; Grundlage für Banner, die alle Stufen sehen (Einführungen). */
+    val consentGiven: Boolean = enabled,
+) {
     companion object {
-        val Disabled = AdsUi(false, AdUnits())
+        val Disabled = AdsUi(false, AdUnits(), consentGiven = false)
     }
 }
 
@@ -41,7 +46,8 @@ fun AdsProvider(manager: AdsManager?, content: @Composable () -> Unit) {
         return
     }
     val enabled by manager.showAds.collectAsStateWithLifecycle()
-    CompositionLocalProvider(LocalAds provides AdsUi(enabled, manager.units), content = content)
+    val consent by manager.canRequestAds.collectAsStateWithLifecycle()
+    CompositionLocalProvider(LocalAds provides AdsUi(enabled, manager.units, consent), content = content)
 }
 
 private enum class BannerKind { ANCHORED, INLINE }
@@ -85,11 +91,16 @@ fun AnchoredAdBar(modifier: Modifier = Modifier) {
     }
 }
 
-/** Banner im scrollbaren Inhalt, mit Abstand oben und unten. */
+/**
+ * Banner im scrollbaren Inhalt, mit Abstand oben und unten.
+ *
+ * @param forAllTiers auch für Social Club und „werbefrei“ (nur in den Einführungen, siehe [AdPolicy.showInWizard])
+ */
 @Composable
-fun InlineAd(modifier: Modifier = Modifier) {
+fun InlineAd(modifier: Modifier = Modifier, forAllTiers: Boolean = false) {
     val ads = LocalAds.current
-    if (!ads.enabled) return
+    val show = if (forAllTiers) AdPolicy.showInWizard(ads.consentGiven) else ads.enabled
+    if (!show) return
     Column(modifier = modifier.fillMaxWidth().padding(vertical = (AdPolicy.SPACING_DP / 2).dp)) {
         Banner(ads.units.inlineBanner, BannerKind.INLINE)
     }

@@ -76,6 +76,8 @@ fun ClubScreen(
     boxPrefs: ClubBoxPrefs? = null,
     market: MarketRepository? = null,
     dispensing: Boolean = true,
+    /** Gesehene Club-Einführungen je Rolle; null = keine automatische Einführung. */
+    onboarding: de.greenganja.growguardian.ui.wizard.OnboardingPrefs? = null,
     viewModel: ClubViewModel = viewModel { ClubViewModel(clubs, subscriptions, clubBoxes, ownBoxes, boxPrefs, dispensing) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -137,9 +139,22 @@ fun ClubScreen(
         }
     }
 
+    // Eigene Einführung je Rolle, einmal beim ersten Öffnen (erneut über Konto → Club-Einführung)
+    val wizardRole = ClubWizardRole.of(state.membership)
+    val wizardKey = de.greenganja.growguardian.ui.wizard.OnboardingPrefs.club(wizardRole.key)
+    var wizardOpen by remember(wizardRole) { mutableStateOf(onboarding?.seen(wizardKey, ClubWizardContent.VERSION) == false) }
+
     // Mitglieder, Antragsteller und Menschen ohne Club sehen den Bereich in Rot-Lila, das Team im App-Grün
     ClubAreaTheme(member = state.membership?.isStaff != true) {
-        Scaffold(modifier = modifier, snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+        if (wizardOpen && !state.loading) {
+            androidx.activity.compose.BackHandler { onboarding?.markSeen(wizardKey, ClubWizardContent.VERSION); wizardOpen = false }
+            Box(modifier = modifier.fillMaxSize()) {
+                ClubWizard(wizardRole, dispensing, onDone = {
+                    onboarding?.markSeen(wizardKey, ClubWizardContent.VERSION)
+                    wizardOpen = false
+                })
+            }
+        } else Scaffold(modifier = modifier, snackbarHost = { SnackbarHost(snackbar) }) { padding ->
             Box(modifier = Modifier.padding(padding).fillMaxSize()) {
                 val membership = state.membership
                 when {

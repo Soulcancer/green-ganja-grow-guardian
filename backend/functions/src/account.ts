@@ -1,7 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { onCall } from "firebase-functions/v2/https";
-import { getMembership, requireUid } from "./access";
+import { getMembership, requireSignedIn } from "./access";
 import { removeFromClub } from "./clubs";
 import { storeCallOptions } from "./config";
 import { fail } from "./errors";
@@ -18,7 +18,7 @@ import { revokeSeat } from "./seats";
  * Club-Inhaber müssen zuerst den Club auflösen (Abo kündigen), damit Mitglieder nicht ohne Club dastehen.
  */
 export const deleteMyAccount = onCall(storeCallOptions, async (request) => {
-  const uid = requireUid(request);
+  const uid = requireSignedIn(request);
   const membership = await getMembership(uid);
   if (membership?.role === "owner") {
     fail("failed-precondition", "owner-cannot-leave",

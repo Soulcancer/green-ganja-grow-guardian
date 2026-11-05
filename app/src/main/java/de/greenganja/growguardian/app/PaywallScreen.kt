@@ -49,7 +49,7 @@ internal object PaywallText {
             "Lichtmodul mit allen Lampenarten: LED, NDL, CMH, MH, T5 … mit Spektrum und Lampenrechner",
         )
         FarmerTier.SOCIAL_CLUB -> listOf(
-            "Alles aus Premium, ohne Grenzen", "Werbefrei", "Club-Verwaltung mit 5 Team-Plätzen",
+            "Alles aus Premium, ohne Grenzen", "Werbefrei (außer in den Einführungen)", "Club-Verwaltung mit 5 Team-Plätzen",
             "Mitglieder, Reservierungen, Abgabe-Doku nach KCanG", "Gemeinsame Club-Boxen und Marktplatz-Angebote",
         )
     }

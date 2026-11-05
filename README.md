@@ -290,6 +290,14 @@ Premium und Social Club können Steckdosen und Schaltleisten automatisch schalte
 
 Jede Box (jedes Zelt) hat beliebig viele Pflanzen, höchstens 50 (`grow/plants/Plant.kt`, `users/{uid}/growBoxes/{boxId}/plants`): Name, Sorte, Samen oder Steckling, Automatik ja/nein, Starttag, Blütebeginn, Notiz; „Ernten“ setzt Erntetag und Trockengewicht, die Pflanze wandert zu „Geerntet“. Box, Sensoren, Zielwerte und Phase teilen sich alle Pflanzen der Box. Tagebuch-Einträge lassen sich einer Pflanze oder der ganzen Box zuordnen (`plantId`). Ohne Social Club zeigt die App ab der vierten wachsenden Pflanze einen Hinweis auf § 9 KCanG (privat 3 Pflanzen je volljähriger Person). Alte Boxen mit Sorte und Starttag direkt an der Box werden beim ersten Öffnen als „Pflanze 1“ übernommen.
 
+### Startseite, E-Mail-Bestätigung und Einführungen
+
+- **Startseite** (`app/WelcomeScreen.kt`): ohne Login erst Erklärung, Stufen und „Wichtige Hinweise“ (18+, KCanG, keine Weitergabe, keine Rechts- oder Medizinberatung); weiter nur mit beiden Bestätigungen, dann Registrieren oder Anmelden. Version der Hinweise in `WelcomeContent.DISCLAIMER_VERSION`.
+- **E-Mail-Bestätigung** (`app/VerifyEmailScreen.kt`): Nach der Registrierung geht eine Bestätigungs-Mail (Deutsch) raus; ohne bestätigte Adresse kommt niemand in die App. Der Bildschirm prüft alle 5 s, bietet „Ich habe bestätigt“, „Mail erneut senden“ (60 s Sperre) und Abmelden. Danach holt die App ein frisches ID-Token. Durchgesetzt auch im Backend: `requireUid` verlangt `email_verified` (Ausnahme: `deleteMyAccount`), die Firestore-Regeln ebenso (`signedIn()`).
+- **App-Einführung** (`grow/ui/AppWizard.kt`): beim ersten Start; führt durch die ganze App außer dem Club: Box anlegen, Pflanzen, Licht, Sensoren, Zielwerte, Alarme (mit echten Einstellungen), dann Analyse, Coins und Konto. Nach dem Anlegen einer Box startet derselbe Assistent nur mit den Box-Schritten; in der Box zeigt „Einrichtung“, wie viele Schritte erledigt sind.
+- **Club-Einführung** (`club/ui/ClubWizard.kt`): eigene Einführung je Rolle (ohne Club, Antrag offen, Mitglied, Team, Inhaber), beim ersten Öffnen des Club-Bereichs; in der Play-Fassung ohne Reservierung und Abgabe.
+- Beide lassen sich unter Konto neu starten. **In den Einführungen sehen alle Stufen Banner**, auch Social Club und „werbefrei“ (`AdPolicy.showInWizard`, nur mit Werbe-Einwilligung).
+
 ### Boxen und Pflanzen löschen
 
 - **Box löschen:** in der Übersicht über ⋮ an jeder Box (auch an gesperrten) oder in der Box-Ansicht über den Papierkorb oben. `deleteGrowBox` löscht die Box mit Verlauf, Statistik, Tagebuch und Lichtmessungen (`recursiveDelete`), ihre Automationen und für den Club geteilte Ansichten der Box. Die Sensoren bleiben im Konto; nach dem Löschen einer aktiven Box rückt eine gesperrte nach.

@@ -5,8 +5,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Angemeldet mit bestätigter E-Mail-Adresse
     function signedIn() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
     function isStaff(clubId) {

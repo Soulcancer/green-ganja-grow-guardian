@@ -28,6 +28,8 @@ import de.greenganja.growguardian.club.SharedClubBoxPrefs
 import de.greenganja.growguardian.club.ui.ClubScreen
 import de.greenganja.growguardian.grow.ui.GrowScreen
 import de.greenganja.growguardian.rewards.RewardsScreen
+import de.greenganja.growguardian.ui.wizard.OnboardingPrefs
+import de.greenganja.growguardian.club.ui.ClubWizardRole
 
 private enum class AppTab(val label: String, val icon: ImageVector) {
     GROW("Grow", Icons.Filled.Grass),
@@ -49,12 +51,20 @@ fun AppNavigation(app: GrowGuardianApp) {
         auth.addAuthStateListener(listener)
         onDispose { auth.removeAuthStateListener(listener) }
     }
+    // Bestätigt? AuthStateListener meldet das nicht, deshalb eigener Zustand je Konto
+    var verified by remember(uid) { mutableStateOf(auth.currentUser?.isEmailVerified == true) }
+    var mailSentAt by remember { mutableStateOf<String?>(null) }
     if (uid == null) {
-        StartFlow(auth)
+        StartFlow(auth, onRegistered = { mailSentAt = auth.currentUser?.uid })
+        return
+    }
+    if (!verified) {
+        VerifyEmailScreen(auth, sentAtStart = mailSentAt == uid, onVerified = { verified = true })
         return
     }
 
     var tab by rememberSaveable { mutableStateOf(AppTab.GROW) }
+    val onboarding = remember { OnboardingPrefs(app) }
     var paywall by rememberSaveable { mutableStateOf(false) }
     val openPaywall = { paywall = true }
 
@@ -92,6 +102,7 @@ fun AppNavigation(app: GrowGuardianApp) {
                 history = app.growHistory,
                 automations = app.growAutomations,
                 wallet = app.wallets.wallet(),
+                onboarding = onboarding,
                 modifier = modifier,
             )
             AppTab.CLUB -> ClubScreen(
@@ -104,9 +115,16 @@ fun AppNavigation(app: GrowGuardianApp) {
                 boxPrefs = remember { SharedClubBoxPrefs(app) },
                 market = app.market,
                 dispensing = Distribution.dispensing,
+                onboarding = onboarding,
             )
             AppTab.COINS -> RewardsScreen(app.wallets, app.subscriptions, app.ads, modifier = modifier)
-            AppTab.ACCOUNT -> AccountScreen(app, onUpgradeClick = openPaywall, modifier = modifier)
+            AppTab.ACCOUNT -> AccountScreen(
+                app,
+                onUpgradeClick = openPaywall,
+                modifier = modifier,
+                onAppTour = { onboarding.reset(OnboardingPrefs.APP); tab = AppTab.GROW },
+                onClubTour = { ClubWizardRole.entries.forEach { onboarding.reset(OnboardingPrefs.club(it.key)) }; tab = AppTab.CLUB },
+            )
         }
     }
 }
@@ -115,7 +133,7 @@ private enum class StartPage { WELCOME, SIGN_IN, REGISTER }
 
 /** Ohne Login: erst die erklärende Startseite mit Hinweisen, dann Anmelden oder Registrieren. */
 @Composable
-private fun StartFlow(auth: FirebaseAuth) {
+private fun StartFlow(auth: FirebaseAuth, onRegistered: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val consent = remember { WelcomeConsent(context) }
     var page by rememberSaveable { mutableStateOf(StartPage.WELCOME) }
@@ -123,7 +141,7 @@ private fun StartFlow(auth: FirebaseAuth) {
         StartPage.WELCOME -> WelcomeScreen(consent, onRegister = { page = StartPage.REGISTER }, onSignIn = { page = StartPage.SIGN_IN })
         StartPage.SIGN_IN, StartPage.REGISTER -> {
             BackHandler { page = StartPage.WELCOME }
-            SignInScreen(auth, initialRegister = page == StartPage.REGISTER, onBack = { page = StartPage.WELCOME })
+            SignInScreen(auth, initialRegister = page == StartPage.REGISTER, onBack = { page = StartPage.WELCOME }, onRegistered = onRegistered)
         }
     }
 }
