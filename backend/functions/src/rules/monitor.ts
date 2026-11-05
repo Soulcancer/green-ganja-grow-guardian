@@ -20,7 +20,7 @@ export function tuyaSign(clientId: string, secret: string, accessToken: string, 
 
 export type MetricId =
   | "air_temperature" | "air_humidity" | "vpd" | "co2" | "soil_moisture" | "soil_temperature"
-  | "water_temperature" | "ph" | "ec" | "tds" | "power";
+  | "water_temperature" | "ph" | "ec" | "tds" | "power" | "light";
 
 export const METRIC_INFO: Record<MetricId, { label: string; unit: string; decimals: number }> = {
   air_temperature: { label: "Temperatur", unit: "°C", decimals: 1 },
@@ -34,6 +34,7 @@ export const METRIC_INFO: Record<MetricId, { label: string; unit: string; decima
   ec: { label: "EC", unit: "mS/cm", decimals: 2 },
   tds: { label: "TDS", unit: "ppm", decimals: 0 },
   power: { label: "Leistung", unit: "W", decimals: 1 },
+  light: { label: "Licht", unit: "lx", decimals: 0 },
 };
 
 const TEMPERATURE = ["va_temperature", "temp_current", "temp_value", "temperature"];
@@ -43,11 +44,13 @@ const PH = ["ph_current", "ph_value"];
 const EC = ["ec_current", "ec_value"];
 const TDS = ["tds_current", "tds_value"];
 const SOIL = ["soil_moisture", "soil_humidity"];
+const LIGHT = ["bright_value", "illuminance_value", "lux_value"];
+const LIGHT_CATEGORIES = ["ldcg"];
 const SOIL_CATEGORIES = ["zwjcy"];
 const PLUG_CATEGORIES = ["cz", "pc", "kg"];
 const TEMPERATURE_METRICS: MetricId[] = ["air_temperature", "soil_temperature", "water_temperature"];
 
-export type DeviceKind = "soil" | "water" | "co2" | "plug" | "climate" | "other";
+export type DeviceKind = "soil" | "water" | "co2" | "plug" | "climate" | "light" | "other";
 
 export function kindOf(category: string | undefined, codes: string[]): DeviceKind {
   const has = (list: string[]) => codes.some((c) => list.includes(c));
@@ -56,6 +59,7 @@ export function kindOf(category: string | undefined, codes: string[]): DeviceKin
   if (has(CO2)) return "co2";
   if ((category && PLUG_CATEGORIES.includes(category)) || codes.includes("cur_power")) return "plug";
   if (has(TEMPERATURE) || has(HUMIDITY)) return "climate";
+  if ((category && LIGHT_CATEGORIES.includes(category)) || has(LIGHT)) return "light";
   return "other";
 }
 
@@ -66,6 +70,7 @@ export function metricFor(code: string, kind: DeviceKind): MetricId | null {
   if (TDS.includes(code)) return "tds";
   if (SOIL.includes(code)) return "soil_moisture";
   if (code === "cur_power") return "power";
+  if (LIGHT.includes(code)) return "light";
   if (TEMPERATURE.includes(code)) {
     if (kind === "water") return "water_temperature";
     if (kind === "soil") return "soil_temperature";
@@ -99,6 +104,7 @@ function plausible(metric: MetricId, value: number): boolean {
     case "ph": return value >= 0 && value <= 14;
     case "air_humidity": case "soil_moisture": return value >= 0 && value <= 100;
     case "air_temperature": case "soil_temperature": case "water_temperature": return value >= -40 && value <= 80;
+    case "light": return value >= 0 && value <= 300_000;
     default: return value >= 0;
   }
 }

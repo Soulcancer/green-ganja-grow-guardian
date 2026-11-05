@@ -42,10 +42,11 @@ import kotlinx.coroutines.launch
 /** Was jede Stufe bringt, für die Kaufseite. */
 internal object PaywallText {
     fun benefits(tier: FarmerTier): List<String> = when (tier) {
-        FarmerTier.FREEMIUM -> listOf("1 Grow-Box, 5 Sensoren", "7 Tage Verlauf", "Mit Werbung")
+        FarmerTier.FREEMIUM -> listOf("1 Grow-Box, 5 Sensoren", "7 Tage Verlauf", "Lichtmessung für Tageslicht und Glühbirne", "Mit Werbung")
         FarmerTier.PREMIUM -> listOf(
             "3 Grow-Boxen, 30 Sensoren", "1 Jahr Verlauf und Analyse", "Alarme bei Werten außerhalb des Ziels",
             "Bis zu 20 Automationen (Licht, Entfeuchter …)", "Datenexport",
+            "Lichtmodul mit allen Lampenarten: LED, NDL, CMH, MH, T5 … mit Spektrum und Lampenrechner",
         )
         FarmerTier.SOCIAL_CLUB -> listOf(
             "Alles aus Premium, ohne Grenzen", "Werbefrei", "Club-Verwaltung mit 5 Team-Plätzen",

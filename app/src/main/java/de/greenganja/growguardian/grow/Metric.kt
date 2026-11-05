@@ -18,6 +18,9 @@ enum class Metric(val id: String, val label: String, val unit: String, val decim
     EC("ec", "EC", "mS/cm", 2),
     TDS("tds", "TDS", "ppm", 0),
     POWER("power", "Leistung", "W", 1),
+
+    /** Beleuchtungsstärke eines Tuya-Lichtsensors; PPFD rechnet das Lichtmodul je nach Lampe aus. */
+    LIGHT("light", "Licht", "lx", 0),
     ;
 
     companion object {

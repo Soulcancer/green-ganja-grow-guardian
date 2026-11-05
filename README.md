@@ -290,6 +290,16 @@ Premium und Social Club können Steckdosen und Schaltleisten automatisch schalte
 
 Je Box: Sorte und Starttag (daraus „Tag 30 · Woche 5, Tag 2“), dazu Einträge mit gegossen, Wassermenge, Dünger, von Hand gemessenen Werten (z. B. pH aus dem Tropfentest) und Notizen. Für alle Stufen. Gespeichert unter `users/{uid}/growBoxes/{boxId}/journal`; die App schreibt direkt, die Firestore-Regeln prüfen das Format. Die Einträge sind in „Meine Daten herunterladen“ enthalten und werden beim Löschen der Box oder des Kontos mitgelöscht.
 
+### Lichtmodul (Licht & Spektrum)
+
+Je Box unter „Licht & Spektrum“ in der Box-Ansicht (`grow/light/`, `grow/ui/LightScreen.kt`):
+
+- **Lampen eintragen:** 28 Lampenarten in sechs Gruppen (Tageslicht, Glühlampen, LED, HID, Leuchtstoff, Sonstige), bis zu 6 je Box mit Leistung und Anzahl, dazu Fläche, Dimmer, Lichtstunden. Gespeichert im Box-Dokument unter `light` über die Function `saveLightSetup`.
+- **Stufen:** Freemium wählt nur **Tageslicht** und **Glühbirne/Halogen**, Premium und Social Club alle Lampen (`TierFeatures.allLampTypes`). Die Function prüft das gegen RevenueCat; die Firestore-Regeln lassen Messungen nur mit freien Lampen, den gespeicherten Lampen der Box oder mit Premium-Stufe (`tierCache`) zu.
+- **Messen:** Handy-Lichtsensor (Median, Warnung bei Sensor am Anschlag), Tuya-Helligkeitssensor (`bright_value`, Kategorie `ldcg`, neue Messgröße `light` in lx), Lux oder PPFD von Hand. Lux → PPFD mit dem Faktor der Lampe, bei Mischungen nach Photonen gewichtet (`LightMath.ppfdPerKlx`). Mehrere Messpunkte ergeben Mittel, Min/Max und Gleichmäßigkeit. Messungen unter `users/{uid}/growBoxes/{boxId}/lightReadings`.
+- **Auswertung:** PPFD und DLI gegen die Phase (mit CO₂ ab 800 ppm höhere Obergrenze), Dimmer-Empfehlung, Photonen je Band (UV-A, Blau, Grün, Rot, Dunkelrot) in % und µmol/m²/s, Blauanteil, Rot : Dunkelrot, Hinweise; Lampenrechner (nötige Watt für das Ziel) und Handy-Kalibrierung gegen ein PAR-Meter.
+- **Richtwerte:** Faktoren nach Thimijan & Heins (1983) und Apogee (Sonne 18,5, NDL 12,2, DE-NDL 13,0, MH 14,1, CMH 4200 K 15,4, CMH 3100 K 17,0, Leuchtstoff 13,5, Glühlampe 20,0 µmol/m²/s je klx), weiße LED nach CRI (80: ≈ 14,3; 90: ≈ 15,9). Spektren und Effizienzen sind typische Werte, keine Messungen eurer Lampen. Schmalbandige LEDs (Rot/Blau, 660 nm, 450 nm) misst Lux nur grob, UV und Far-Red gar nicht; dafür PPFD von Hand eintragen.
+
 ### Server-Überwachung über die Tuya Cloud (empfohlen)
 
 Die Cloud Function `serverMonitor` (`serverMonitor.ts`, Regeln in `rules/monitor.ts`) läuft alle 5 Minuten, ganz ohne Handy:
@@ -532,6 +542,7 @@ Die Schritte bis zur Veröffentlichung stehen in **`docs/RELEASE.md`**. Bauen mi
 - **Server-Überwachung** (Push-Alarme, Automationen) braucht ein Tuya-Cloud-Projekt; Besitzprüfung und API-Kontingent mit echten Geräten prüfen (siehe „Server-Überwachung“). Ohne Cloud-Projekt kommen Alarme wie bisher vom Handy.
 - **Benachrichtigungs-Einstellungen der Mitglieder** (Reservierungen, Club-Boxen, Marktplatz) sind gespeichert, aber es gibt noch keine Server-Pushes für diese Ereignisse. Dafür braucht es FCM-Tokens in Firestore und Functions, die bei Statuswechseln senden.
 - **Club-Boxen** zeigen nur die letzten Werte, keinen Verlauf. Sie hängen am Handy des Betreuers: Ist es lange aus, erscheint die Box als offline.
+- **Lichtmodul:** Handy-Lichtsensoren unterscheiden sich stark (Messbereich, Farbempfindlichkeit, Lage). Ohne Kalibrierung gegen ein PAR-Meter sind ±20–30 % üblich; viele Handys gehen bei 30 000–60 000 lx an den Anschlag, also unter starken Blütelampen. Die Lampenwerte sind Richtwerte; mit Herstellerdaten (µmol/J, Spektrum) lassen sie sich in `Lamps.kt` verfeinern.
 - Der Verlauf hat Lücken, wenn das Handy lange aus oder ohne Netz ist. Mehrere Handys desselben Kontos schreiben in denselben Verlauf, das ist unschädlich.
 
 - **Google Play**: Die Play-Richtlinien verbieten Apps, die die Abholung von Cannabis organisieren, ausdrücklich auch dort, wo es legal ist. Reservierungen und Abgabe-Doku liegen deshalb gebündelt im Paket `club`, damit sie sich bei Bedarf in ein eigenes Modul oder eine eigene App auslagern lassen.

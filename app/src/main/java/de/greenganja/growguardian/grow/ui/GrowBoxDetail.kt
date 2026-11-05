@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,6 +66,7 @@ internal fun BoxDetail(
     onHistory: (() -> Unit)?,
     onAutomations: (() -> Unit)? = null,
     onJournal: (() -> Unit)? = null,
+    onLight: (() -> Unit)? = null,
     onBack: () -> Unit,
 ) {
     val box = item.box
@@ -132,6 +134,17 @@ internal fun BoxDetail(
                             title = "Tagebuch",
                             subtitle = "Gießen, Düngen, Messwerte von Hand, Notizen",
                             onClick = onJournal,
+                        )
+                    }
+                }
+                if (onLight != null) {
+                    item {
+                        UpgradeLikeRow(
+                            icon = Icons.Filled.WbSunny,
+                            title = "Licht & Spektrum",
+                            subtitle = if (state.access.features.allLampTypes) "PPFD, DLI und Spektrum für alle Lampenarten"
+                            else "PPFD und DLI für Tageslicht und Glühbirne, alle Lampen ab Premium",
+                            onClick = onLight,
                         )
                     }
                 }

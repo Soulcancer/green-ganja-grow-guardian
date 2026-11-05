@@ -92,5 +92,6 @@ internal fun DocumentSnapshot.toGrowBox(): GrowBox? {
         alertsEnabled = getBoolean("alerts") != false,
         strain = getString("strain"),
         plantedAt = getString("plantedAt"),
+        light = de.greenganja.growguardian.grow.light.LightRules.parseSetup(get("light")),
     )
 }

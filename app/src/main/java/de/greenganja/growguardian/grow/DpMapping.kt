@@ -19,6 +19,7 @@ enum class DeviceKind(val label: String) {
     SOIL("Bodensensor"),
     WATER("Wassertester"),
     PLUG("Steckdose"),
+    LIGHT("Lichtsensor"),
     OTHER("Gerät"),
 }
 
@@ -37,6 +38,10 @@ object DpMapping {
     private val EC_CODES = setOf("ec_current", "ec_value")
     private val TDS_CODES = setOf("tds_current", "tds_value")
     private val SOIL_CODES = setOf("soil_moisture", "soil_humidity")
+    private val LIGHT_CODES = setOf("bright_value", "illuminance_value", "lux_value")
+
+    /** Tuya-Kategorie für Helligkeitssensoren. */
+    private val LIGHT_CATEGORIES = setOf("ldcg")
 
     /** Tuya-Kategorie für Pflanzen- bzw. Bodensensoren. */
     private val SOIL_CATEGORIES = setOf("zwjcy")
@@ -53,6 +58,7 @@ object DpMapping {
         codes.any { it in CO2_CODES } -> DeviceKind.CO2
         category in PLUG_CATEGORIES || "cur_power" in codes -> DeviceKind.PLUG
         codes.any { it in TEMPERATURE || it in HUMIDITY } -> DeviceKind.CLIMATE
+        category in LIGHT_CATEGORIES || codes.any { it in LIGHT_CODES } -> DeviceKind.LIGHT
         else -> DeviceKind.OTHER
     }
 
@@ -65,6 +71,7 @@ object DpMapping {
             in TDS_CODES -> Metric.TDS
             in SOIL_CODES -> Metric.SOIL_MOISTURE
             "cur_power" -> Metric.POWER
+            in LIGHT_CODES -> Metric.LIGHT
             in TEMPERATURE -> when (kind) {
                 DeviceKind.WATER -> Metric.WATER_TEMPERATURE
                 DeviceKind.SOIL -> Metric.SOIL_TEMPERATURE
@@ -165,5 +172,6 @@ object DpMapping {
         Metric.AIR_TEMPERATURE, Metric.SOIL_TEMPERATURE, Metric.WATER_TEMPERATURE -> value in -40.0..80.0
         Metric.CO2, Metric.TDS, Metric.EC, Metric.POWER -> value >= 0.0
         Metric.VPD -> value >= 0.0
+        Metric.LIGHT -> value in 0.0..300_000.0
     }
 }

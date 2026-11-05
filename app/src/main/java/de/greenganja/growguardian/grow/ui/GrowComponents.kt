@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Co2
 import androidx.compose.material.icons.filled.Grass
 import androidx.compose.material.icons.filled.Opacity
@@ -60,6 +61,7 @@ internal val Metric.icon: ImageVector
         Metric.PH -> Icons.Filled.Science
         Metric.EC, Metric.TDS -> Icons.Filled.Opacity
         Metric.POWER -> Icons.Filled.Bolt
+        Metric.LIGHT -> Icons.Filled.WbSunny
     }
 
 internal val DeviceKind.icon: ImageVector
@@ -69,6 +71,7 @@ internal val DeviceKind.icon: ImageVector
         DeviceKind.SOIL -> Icons.Filled.Grass
         DeviceKind.WATER -> Icons.Filled.Science
         DeviceKind.PLUG -> Icons.Filled.Bolt
+        DeviceKind.LIGHT -> Icons.Filled.WbSunny
         DeviceKind.OTHER -> Icons.Filled.Air
     }
 

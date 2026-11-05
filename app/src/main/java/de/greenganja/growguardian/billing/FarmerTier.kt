@@ -26,6 +26,7 @@ enum class FarmerTier(
             maxAutomations = 0,
             dataExport = false,
             seats = 1,
+            allLampTypes = false,
         ),
     ),
     PREMIUM(
@@ -40,6 +41,7 @@ enum class FarmerTier(
             maxAutomations = 20,
             dataExport = true,
             seats = 1,
+            allLampTypes = true,
         ),
     ),
     SOCIAL_CLUB(
@@ -56,6 +58,7 @@ enum class FarmerTier(
             // 5 festgelegte Personen pro Club-Abo, der Käufer zählt mit.
             // Muss mit SEATS_PER_CLUB im Backend übereinstimmen.
             seats = 5,
+            allLampTypes = true,
         ),
     );
 
@@ -92,6 +95,8 @@ data class TierFeatures(
     val dataExport: Boolean,
     /** Personen, die ein Abo dieser Stufe nutzen dürfen, der Käufer eingeschlossen. */
     val seats: Int,
+    /** Lichtmodul: alle Lampenarten. Ohne nur Tageslicht und Glühbirne. Muss zu saveLightSetup passen. */
+    val allLampTypes: Boolean = false,
 ) {
     /** Mehrere Personen teilen sich Räume und Geräte. */
     val teamAccess: Boolean get() = seats > 1

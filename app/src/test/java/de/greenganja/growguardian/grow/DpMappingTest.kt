@@ -8,6 +8,20 @@ import org.junit.Test
 class DpMappingTest {
 
     @Test
+    fun `Helligkeitssensor liefert Lux`() {
+        val definitions = listOf(
+            DpDefinition("2", "bright_value", scale = 0, unit = "lux"),
+            DpDefinition("4", "battery_percentage", scale = 0, unit = "%"),
+        )
+        assertEquals(DeviceKind.LIGHT, DpMapping.kindOf("ldcg", definitions.map { it.code }))
+        assertEquals(mapOf(Metric.LIGHT to 42_000.0), DpMapping.read(definitions, mapOf("2" to 42_000, "4" to 80), category = "ldcg"))
+        // Klimasensor mit eingebautem Lichtsensor bleibt Klimasensor
+        val combo = listOf(DpDefinition("1", "va_temperature", scale = 1), DpDefinition("3", "bright_value"))
+        assertEquals(DeviceKind.CLIMATE, DpMapping.kindOf("wsdcg", combo.map { it.code }))
+        assertEquals(mapOf(Metric.AIR_TEMPERATURE to 24.0, Metric.LIGHT to 300.0), DpMapping.read(combo, mapOf("1" to 240, "3" to 300), category = "wsdcg"))
+    }
+
+    @Test
     fun `liest Klimasensor mit Skalierung`() {
         val definitions = listOf(
             DpDefinition("1", "va_temperature", scale = 1, unit = "℃"),

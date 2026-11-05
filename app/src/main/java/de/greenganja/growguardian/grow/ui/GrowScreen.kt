@@ -38,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +51,8 @@ import de.greenganja.growguardian.grow.Metric
 import de.greenganja.growguardian.grow.SensorSource
 import de.greenganja.growguardian.grow.automation.GrowAutomations
 import de.greenganja.growguardian.grow.journal.JournalRepository
+import de.greenganja.growguardian.grow.light.LightRepository
+import de.greenganja.growguardian.grow.light.PhoneLightSensor
 import de.greenganja.growguardian.grow.history.GrowHistoryRepository
 import de.greenganja.growguardian.tuya.TuyaPairing
 import de.greenganja.growguardian.ui.theme.GrowPalette
@@ -63,6 +66,7 @@ private const val ROUTE_PAIR = "pair"
 private const val ROUTE_HISTORY = "history:"
 private const val ROUTE_AUTOMATIONS = "automations:"
 private const val ROUTE_JOURNAL = "journal:"
+private const val ROUTE_LIGHT = "light:"
 
 /**
  * Einstieg in die Grow-Box-Überwachung: Übersicht, Box-Details und Assistent für neue Boxen.
@@ -83,6 +87,7 @@ fun GrowScreen(
     automations: GrowAutomations? = null,
     wallet: kotlinx.coroutines.flow.Flow<de.greenganja.growguardian.rewards.Wallet>? = null,
     journal: JournalRepository = remember { JournalRepository() },
+    light: LightRepository = remember { LightRepository() },
     modifier: Modifier = Modifier,
     viewModel: GrowViewModel = viewModel { GrowViewModel(repository, sensors, subscriptions, automations, wallet) },
 ) {
@@ -103,6 +108,7 @@ fun GrowScreen(
             route.startsWith(ROUTE_HISTORY) -> ROUTE_BOX + route.removePrefix(ROUTE_HISTORY)
             route.startsWith(ROUTE_AUTOMATIONS) -> ROUTE_BOX + route.removePrefix(ROUTE_AUTOMATIONS)
             route.startsWith(ROUTE_JOURNAL) -> ROUTE_BOX + route.removePrefix(ROUTE_JOURNAL)
+            route.startsWith(ROUTE_LIGHT) -> ROUTE_BOX + route.removePrefix(ROUTE_LIGHT)
             else -> ROUTE_LIST
         }
     }
@@ -151,6 +157,27 @@ fun GrowScreen(
                         )
                     }
                 }
+                route.startsWith(ROUTE_LIGHT) -> {
+                    val boxId = route.removePrefix(ROUTE_LIGHT)
+                    val item = state.item(boxId)
+                    if (item == null || item.locked) {
+                        LaunchedEffect(route) { route = ROUTE_LIST }
+                    } else {
+                        val context = LocalContext.current
+                        val lightViewModel: LightViewModel = viewModel(key = "light-$boxId") {
+                            LightViewModel(boxId, light, PhoneLightSensor(context))
+                        }
+                        val scope = rememberCoroutineScope()
+                        LightScreen(
+                            item = item,
+                            allLampTypes = state.access.features.allLampTypes,
+                            viewModel = lightViewModel,
+                            onUpgradeClick = onUpgradeClick,
+                            onMessage = { text -> scope.launch { snackbar.showSnackbar(text) } },
+                            onBack = { route = ROUTE_BOX + boxId },
+                        )
+                    }
+                }
                 route.startsWith(ROUTE_AUTOMATIONS) && automations != null -> {
                     val boxId = route.removePrefix(ROUTE_AUTOMATIONS)
                     val item = state.item(boxId)
@@ -193,6 +220,7 @@ fun GrowScreen(
                             onHistory = history?.let { { route = ROUTE_HISTORY + item.box.id } },
                             onAutomations = automations?.let { { route = ROUTE_AUTOMATIONS + item.box.id } },
                             onJournal = { route = ROUTE_JOURNAL + item.box.id },
+                            onLight = { route = ROUTE_LIGHT + item.box.id },
                             onBack = { route = ROUTE_LIST },
                         )
                     }

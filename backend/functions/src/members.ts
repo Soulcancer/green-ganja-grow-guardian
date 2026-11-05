@@ -62,6 +62,7 @@ export const exportMyData = onCall(callOptions, async (request) => {
     id: d.id,
     ...(plain(d.data()) as object),
     journal: (await d.ref.collection("journal").get()).docs.map((j) => ({ id: j.id, ...(plain(j.data()) as object) })),
+    lightReadings: (await d.ref.collection("lightReadings").get()).docs.map((l) => ({ id: l.id, ...(plain(l.data()) as object) })),
   })));
   result.automations = automations.docs.map((d) => ({ id: d.id, ...(plain(d.data()) as object) }));
   return { json: JSON.stringify(result, null, 2) };

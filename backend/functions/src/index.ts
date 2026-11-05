@@ -12,6 +12,7 @@
  *                        requestPropagation, cancelPropagation, decidePropagation
  * Abgabe-Doku (§ 26):    recordHandout, exportDispensations
  * Grow-Boxen:            saveGrowBox, deleteGrowBox
+ * Lichtmodul:            saveLightSetup (Lampen einer Box; Freemium nur Tageslicht und Glühbirne)
  * Verlauf:               onHistoryDayCreated, nightlyGrowStats
  * Automationen:          saveAutomation, deleteAutomation
  * Club-Boxen:            shareClubBox, unshareClubBox
@@ -21,6 +22,7 @@
 export { approveMember, createClub, createStaffInvite, joinClub, leaveClub, removeMember, removeStaff, rotateMemberCode } from "./clubs";
 export { cancelReservation, decideReservation, exportDispensations, recordHandout, requestReservation, updateReservation } from "./reservations";
 export { deleteGrowBox, saveGrowBox } from "./grow";
+export { saveLightSetup } from "./light";
 export { deleteAutomation, saveAutomation } from "./automations";
 export { shareClubBox, unshareClubBox } from "./clubboxes";
 export { deleteMyAccount } from "./account";

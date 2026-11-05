@@ -33,7 +33,8 @@ export type Reason =
   | "propagation-limit"
   | "already-claimed"
   | "insufficient-coins"
-  | "not-needed";
+  | "not-needed"
+  | "lamps-premium";
 
 /** Wirft einen Fehler mit deutscher Meldung, die die App direkt anzeigen kann. */
 export function fail(

@@ -132,6 +132,16 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/users/$(uid)/growBoxes/$(boxId));
       }
 
+      // Lichtmessungen: der Nutzer schreibt selbst. Lampen: Tageslicht und Glühbirne für alle, sonst nur die
+      // Lampen, die saveLightSetup (prüft die Stufe) für diese Box gespeichert hat, oder mit Premium-Stufe
+      match /lightReadings/{readingId} {
+        allow read, delete: if isUser(uid);
+        allow create: if isUser(uid)
+          && validLightReading(request.resource.data)
+          && exists(/databases/$(database)/documents/users/$(uid)/growBoxes/$(boxId))
+          && lampsAllowed(uid, boxId, request.resource.data.lampIds);
+      }
+
       // Tagesstatistik für lange Zeiträume, schreibt nur die nächtliche Function
       match /stats/{year} {
         allow read: if isUser(uid);
@@ -161,6 +171,27 @@ service cloud.firestore {
         && optionalNumber(data, 'nutrientsMl', 0, 10000)
         && (!('values' in data) || (data.values is map && data.values.size() <= 11))
         && (!('notes' in data) || data.notes == null || (data.notes is string && data.notes.size() <= 2000));
+    }
+
+    function validLightReading(d) {
+      return d.keys().hasOnly(['createdAt', 'source', 'lux', 'ppfd', 'dli', 'hours', 'points', 'minPpfd', 'maxPpfd', 'lampIds', 'phase'])
+        && d.createdAt == request.time
+        && d.source in ['phone', 'tuya', 'manual_lux', 'manual_ppfd']
+        && d.ppfd is number && d.ppfd >= 0 && d.ppfd <= 5000
+        && optionalNumber(d, 'lux', 0, 300000)
+        && optionalNumber(d, 'dli', 0, 200)
+        && optionalNumber(d, 'hours', 0, 24)
+        && optionalNumber(d, 'minPpfd', 0, 5000)
+        && optionalNumber(d, 'maxPpfd', 0, 5000)
+        && d.points is int && d.points >= 1 && d.points <= 25
+        && d.lampIds is list && d.lampIds.size() >= 1 && d.lampIds.size() <= 6
+        && (!('phase' in d) || d.phase == null || (d.phase is string && d.phase.size() <= 20));
+    }
+
+    function lampsAllowed(uid, boxId, ids) {
+      return ids.hasOnly(['daylight', 'incandescent'])
+        || ids.hasOnly(get(/databases/$(database)/documents/users/$(uid)/growBoxes/$(boxId)).data.get('light', {}).get('lampIds', []))
+        || get(/databases/$(database)/documents/users/$(uid)).data.get('tierCache', {}).get('tier', 'freemium') in ['premium', 'social_club'];
     }
 
     function validHistory(day) {

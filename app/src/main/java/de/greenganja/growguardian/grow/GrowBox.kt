@@ -18,6 +18,8 @@ data class GrowBox(
     val strain: String? = null,
     /** Starttag des Grows "YYYY-MM-DD". */
     val plantedAt: String? = null,
+    /** Lampen der Box; gespeichert über saveLightSetup, nicht über saveGrowBox. */
+    val light: de.greenganja.growguardian.grow.light.LightSetup? = null,
 ) {
     val targets: Map<Metric, TargetRange>
         get() = DefaultTargets.forPhase(phase, medium) + customTargets
