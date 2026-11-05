@@ -70,8 +70,9 @@ App in der Tuya IoT Platform: Paketname und SHA-256 eintragen, AppKey/AppSecret 
    `bash setup-firebase.sh <projekt-id>`
    Das Skript legt Firestore (europe-west3), E-Mail-Anmeldung, die Android-App und eine schlüssellose Anmeldung für
    GitHub Actions an (nur für dieses Repository, keine Schlüsseldateien).
-4. Die letzte Zeile (`GGG-FIREBASE projekt=… nummer=…`) als Repository-Variablen eintragen:
-   `FIREBASE_PROJECT_ID` und `GCP_PROJECT_NUMBER` (*Settings → Secrets and variables → Actions → Variables*).
+4. Die letzte Zeile (`GGG-FIREBASE projekt=… nummer=…`) an Claude schicken oder selbst in `backend/firebase-project.json`
+   eintragen (`projectId`, `projectNumber`) und pushen. Alternativ als Repository-Variablen `FIREBASE_PROJECT_ID` und
+   `GCP_PROJECT_NUMBER`; die haben Vorrang vor der Datei.
 5. Danach holt **Android Alpha** die `google-services.json` selbst aus dem Projekt, und **Firebase Deploy**
    (*Actions → Firebase Deploy → Run workflow*) rollt Regeln, Indizes und Functions aus.
    Fehlende Secrets (RevenueCat, Tuya) legt der Workflow mit dem Platzhalter „nicht-gesetzt“ an; echte Werte als

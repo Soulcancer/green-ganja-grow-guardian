@@ -30,21 +30,31 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Firebase-Projekt aus backend/firebase-project.json (Repository-Variablen überschreiben, falls gesetzt)
+      - id: fb
+        env:
+          VAR_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+          VAR_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
+        run: |
+          field() { python3 -c "import json; print(json.load(open('backend/firebase-project.json')).get('$1') or '')" 2>/dev/null; }
+          echo "project=${VAR_PROJECT:-$(field projectId)}" >> "$GITHUB_OUTPUT"
+          echo "number=${VAR_NUMBER:-$(field projectNumber)}" >> "$GITHUB_OUTPUT"
+
       # Nach backend/setup-firebase.sh: Konfiguration direkt aus dem Firebase-Projekt holen
       - id: gcp
-        if: vars.GCP_PROJECT_NUMBER != '' && vars.FIREBASE_PROJECT_ID != ''
+        if: steps.fb.outputs.project != '' && steps.fb.outputs.number != ''
         continue-on-error: true
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: projects/${{ vars.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github/providers/github
-          service_account: github-deploy@${{ vars.FIREBASE_PROJECT_ID }}.iam.gserviceaccount.com
+          workload_identity_provider: projects/${{ steps.fb.outputs.number }}/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-deploy@${{ steps.fb.outputs.project }}.iam.gserviceaccount.com
           token_format: access_token
 
       - name: Firebase-Konfiguration
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
           GCP_TOKEN: ${{ steps.gcp.outputs.access_token }}
-          P: ${{ vars.FIREBASE_PROJECT_ID }}
+          P: ${{ steps.fb.outputs.project }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json

@@ -1,9 +1,9 @@
 # Rollt Firestore-Regeln, Indizes und Cloud Functions aus. Anmeldung bei Google ohne Schlüssel
 # (Workload Identity Federation, eingerichtet von backend/setup-firebase.sh).
 #
-# Repository-Variablen (Settings → Secrets and variables → Actions → Variables):
-#   FIREBASE_PROJECT_ID, GCP_PROJECT_NUMBER   (Pflicht; ohne sie läuft der Workflow nicht)
-#   REVENUECAT_PROJECT_ID, TUYA_BASE_URL       (optional, sonst Werte aus functions/.env.example)
+# Projekt: backend/firebase-project.json (projectId, projectNumber). Ohne beide Werte wird nichts ausgerollt.
+#   Repository-Variablen FIREBASE_PROJECT_ID und GCP_PROJECT_NUMBER überschreiben die Datei, falls gesetzt.
+# Optionale Repository-Variablen: REVENUECAT_PROJECT_ID, TUYA_BASE_URL (sonst Werte aus functions/.env.example)
 # Optionale Secrets, die in den Secret Manager übernommen werden:
 #   REVENUECAT_SECRET_KEY, REVENUECAT_WEBHOOK_SECRET, TUYA_CLIENT_ID, TUYA_CLIENT_SECRET
 #   Fehlt eins, legt der Workflow es mit dem Platzhalter „nicht-gesetzt“ an; die Functions laufen dann ohne diese Funktion.
@@ -22,15 +22,41 @@ on:
 concurrency: firebase-deploy
 
 jobs:
+  config:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      project: ${{ steps.p.outputs.project }}
+      number: ${{ steps.p.outputs.number }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: p
+        env:
+          VAR_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+          VAR_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
+        run: |
+          field() { python3 -c "import json; print(json.load(open('backend/firebase-project.json')).get('$1') or '')"; }
+          project="${VAR_PROJECT:-$(field projectId)}"
+          number="${VAR_NUMBER:-$(field projectNumber)}"
+          echo "project=$project" >> "$GITHUB_OUTPUT"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          if [ -z "$project" ] || [ -z "$number" ]; then
+            echo "::notice::Noch nicht eingerichtet: Projekt-ID und Projektnummer in backend/firebase-project.json fehlen (setup-firebase.sh liefert beide)."
+          else
+            echo "Projekt $project ($number)"
+          fi
+
   deploy:
-    if: vars.GCP_PROJECT_NUMBER != '' && vars.FIREBASE_PROJECT_ID != ''
+    needs: config
+    if: needs.config.outputs.project != '' && needs.config.outputs.number != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
       id-token: write
     env:
-      P: ${{ vars.FIREBASE_PROJECT_ID }}
+      P: ${{ needs.config.outputs.project }}
       FIREBASE_CLI: npx --yes firebase-tools@latest
     defaults:
       run:
@@ -44,8 +70,8 @@ jobs:
 
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: projects/${{ vars.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github/providers/github
-          service_account: github-deploy@${{ vars.FIREBASE_PROJECT_ID }}.iam.gserviceaccount.com
+          workload_identity_provider: projects/${{ needs.config.outputs.number }}/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-deploy@${{ needs.config.outputs.project }}.iam.gserviceaccount.com
 
       - uses: google-github-actions/setup-gcloud@v2
 
